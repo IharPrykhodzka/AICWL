@@ -17,3 +17,9 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# API Keys and Configuration (IMPORTANT: Keep secure!)
+config.properties
+iosApp/iosApp/Info.plist
+iosApp/iosApp/LocalConfig.xcconfig
+iosApp/iosApp/local_config.txt
