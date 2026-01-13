@@ -4,8 +4,8 @@ import platform.Foundation.*
 import kotlinx.cinterop.ExperimentalForeignApi
 
 /**
- * Load API key from local file in the project bundle.
- * The file should be added to Xcode project but NOT committed to git.
+ * Загружает API-ключ из локального файла в бандле проекта.
+ * Файл должен быть добавлен в Xcode проект, но НЕ должен быть закоммичен в git.
  */
 object LocalConfigLoader {
     @OptIn(ExperimentalForeignApi::class)

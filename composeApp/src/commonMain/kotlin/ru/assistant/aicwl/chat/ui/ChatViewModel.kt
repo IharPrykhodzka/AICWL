@@ -8,13 +8,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.assistant.aicwl.chat.agent.chatAgent
 import ru.assistant.aicwl.chat.config.ModelConfig
+import ru.assistant.aicwl.chat.data.EnhancedChatMessage
 import ru.assistant.aicwl.chat.data.MessageRole
 import ru.assistant.aicwl.chat.data.UiChatMessage
 import ru.assistant.aicwl.chat.utils.currentTimeMillis
 import ru.assistant.aicwl.chat.utils.createLogger
 
 /**
- * ViewModel for managing chat state and interactions.
+ * ViewModel для управления состоянием чата и взаимодействиями.
+ * Поддерживает структурированные ответы от AI.
  */
 class ChatViewModel : ViewModel() {
     private val logger = createLogger("ChatViewModel")
@@ -23,7 +25,7 @@ class ChatViewModel : ViewModel() {
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     /**
-     * Update the selected AI model.
+     * Обновляет выбранную AI-модель.
      */
     fun selectModel(modelId: String) {
         logger.i("Model selected: $modelId (display: ${ModelConfig.getDisplayName(modelId)})")
@@ -31,14 +33,15 @@ class ChatViewModel : ViewModel() {
     }
 
     /**
-     * Update the user's input text.
+     * Обновляет текст ввода пользователя.
      */
     fun updateInputText(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
     }
 
     /**
-     * Send the user's message and get AI response.
+     * Отправляет сообщение пользователя и получает ответ AI.
+     * Автоматически определяет тип ответа (структурированный или обычный).
      */
     fun sendMessage() {
         val currentInput = _uiState.value.inputText.trim()
@@ -51,23 +54,24 @@ class ChatViewModel : ViewModel() {
         logger.d("Message: ${currentInput.take(100)}...")
 
         val now = currentTimeMillis()
-        val userMessage = UiChatMessage(
+        val userMessage = EnhancedChatMessage(
             id = generateId(),
             role = MessageRole.USER,
-            content = currentInput,
-            timestamp = now
+            originalContent = currentInput,
+            timestamp = now,
+            messageType = ru.assistant.aicwl.chat.data.MessageType.PLAIN_TEXT
         )
 
-        // Add user message
+        // Добавляем сообщение пользователя
         _uiState.value = _uiState.value.copy(
-            messages = _uiState.value.messages + userMessage,
+            enhancedMessages = _uiState.value.enhancedMessages + userMessage,
             inputText = "",
             isLoading = true
         )
 
-        logger.d("User message added. Total messages: ${_uiState.value.messages.size + 1}")
+        logger.d("User message added. Total messages: ${_uiState.value.enhancedMessages.size + 1}")
 
-        // Get AI response
+        // Получаем ответ AI
         viewModelScope.launch {
             try {
                 logger.d("Starting AI request...")
@@ -77,32 +81,37 @@ class ChatViewModel : ViewModel() {
                 )
 
                 logger.i("AI response received. Length: ${response.length}")
+                logger.d("Response preview: ${response.take(200)}...")
 
-                val assistantMessage = UiChatMessage(
+                // Создаём enhanced сообщение с автоматическим определением типа
+                val assistantMessage = EnhancedChatMessage.fromAiResponse(
                     id = generateId(),
-                    role = MessageRole.ASSISTANT,
                     content = response,
                     timestamp = currentTimeMillis()
                 )
 
+                logger.d("Message type: ${assistantMessage.messageType}")
+                logger.d("Is structured: ${assistantMessage.structuredData != null}")
+
                 _uiState.value = _uiState.value.copy(
-                    messages = _uiState.value.messages + assistantMessage,
+                    enhancedMessages = _uiState.value.enhancedMessages + assistantMessage,
                     isLoading = false
                 )
 
-                logger.d("Assistant message added. Total messages: ${_uiState.value.messages.size}")
+                logger.d("Assistant message added. Total messages: ${_uiState.value.enhancedMessages.size}")
             } catch (e: Exception) {
                 logger.e("Failed to get AI response", e)
 
-                val errorMessage = UiChatMessage(
+                val errorMessage = EnhancedChatMessage(
                     id = generateId(),
                     role = MessageRole.ASSISTANT,
-                    content = "Error: ${e.message}",
-                    timestamp = currentTimeMillis()
+                    originalContent = "Error: ${e.message}",
+                    timestamp = currentTimeMillis(),
+                    messageType = ru.assistant.aicwl.chat.data.MessageType.ERROR
                 )
 
                 _uiState.value = _uiState.value.copy(
-                    messages = _uiState.value.messages + errorMessage,
+                    enhancedMessages = _uiState.value.enhancedMessages + errorMessage,
                     isLoading = false
                 )
             }
@@ -110,23 +119,36 @@ class ChatViewModel : ViewModel() {
     }
 
     /**
-     * Clear all messages from the chat.
+     * Отправляет сообщение из предложений (suggestion).
+     */
+    fun sendSuggestion(suggestion: String) {
+        updateInputText(suggestion)
+        sendMessage()
+    }
+
+    /**
+     * Очищает все сообщения из чата.
      */
     fun clearChat() {
-        logger.i("Clearing chat. Previous messages count: ${_uiState.value.messages.size}")
-        _uiState.value = _uiState.value.copy(messages = emptyList())
+        logger.i("Clearing chat. Previous messages count: ${_uiState.value.enhancedMessages.size}")
+        _uiState.value = _uiState.value.copy(enhancedMessages = emptyList())
     }
 
     private fun generateId(): String = "${currentTimeMillis()}-${(0..999).random()}"
 
     /**
-     * UI State for the chat screen.
+     * UI-состояние для экрана чата.
      */
     data class ChatUiState(
-        val messages: List<UiChatMessage> = emptyList(),
+        // Список расширенных сообщений с поддержкой структурированных ответов
+        val enhancedMessages: List<EnhancedChatMessage> = emptyList(),
         val inputText: String = "",
         val selectedModel: String = ModelConfig.DEFAULT_MODEL,
         val isLoading: Boolean = false,
         val isModelSelectorExpanded: Boolean = false
-    )
+    ) {
+        // Обратная совместимость - простой список для старого UI
+        val messages: List<UiChatMessage>
+            get() = enhancedMessages.map { it.toUiChatMessage() }
+    }
 }

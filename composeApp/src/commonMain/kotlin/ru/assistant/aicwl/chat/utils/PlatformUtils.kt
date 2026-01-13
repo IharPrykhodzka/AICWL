@@ -1,6 +1,6 @@
 package ru.assistant.aicwl.chat.utils
 
 /**
- * Cross-platform time utilities.
+ * Кроссплатформенные утилиты для работы со временем.
  */
 expect fun currentTimeMillis(): Long

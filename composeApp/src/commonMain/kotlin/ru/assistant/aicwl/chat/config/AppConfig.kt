@@ -1,9 +1,9 @@
 package ru.assistant.aicwl.chat.config
 
 /**
- * Application configuration loaded from config.properties or platform-specific sources.
+ * Конфигурация приложения, загружаемая из config.properties или платформенно-зависимых источников.
  *
- * IMPORTANT: Create config.properties in project root with:
+ * ВАЖНО: Создайте config.properties в корне проекта с:
  * llm.z.api.key=YOUR_API_KEY_HERE
  */
 expect object AppConfig {

@@ -1,35 +1,35 @@
 package ru.assistant.aicwl.chat.config
 
 /**
- * Configuration constants for available AI models.
- * Each model has different capabilities and performance characteristics.
+ * Константы конфигурации для доступных AI-моделей.
+ * Каждая модель имеет разные возможности и производительность.
  */
 object ModelConfig {
     /**
-     * Most powerful model - slowest but highest quality responses.
-     * Use for complex reasoning, code generation, and detailed analysis.
+     * Самая мощная модель - самая медленная, но с ответами самого высокого качества.
+     * Используйте для сложных рассуждений, генерации кода и детального анализа.
      */
     const val GLM_MODEL_SENIOR = "glm-4.7"
 
     /**
-     * Balanced model - good quality with reasonable speed.
-     * Recommended default for most use cases.
+     * Сбалансированная модель - хорошее качество с разумной скоростью.
+     * Рекомендуемая модель по умолчанию для большинства случаев.
      */
     const val GLM_MODEL_MIDDLE = "glm-4.6"
 
     /**
-     * Fastest model - lower quality but quickest responses.
-     * Use for simple queries, quick summaries, and when speed matters most.
+     * Самая быстрая модель - более низкое качество, но самые быстрые ответы.
+     * Используйте для простых запросов, быстрых сводок и когда скорость важнее всего.
      */
     const val GLM_MODEL_JUNIOR = "glm-4.5-air"
 
     /**
-     * Default model to use when user hasn't made a selection.
+     * Модель по умолчанию, если пользователь не сделал выбор.
      */
-    const val DEFAULT_MODEL = GLM_MODEL_MIDDLE
+    const val DEFAULT_MODEL = GLM_MODEL_JUNIOR
 
     /**
-     * All available models in order of capability (highest to lowest).
+     * Все доступные модели в порядке убывания возможностей.
      */
     val ALL_MODELS = listOf(
         GLM_MODEL_SENIOR,
@@ -38,7 +38,7 @@ object ModelConfig {
     )
 
     /**
-     * Display names for models (for UI).
+     * Отображаемые имена моделей (для UI).
      */
     val MODEL_DISPLAY_NAMES = mapOf(
         GLM_MODEL_SENIOR to "Senior (GLM-4.7) - Most Powerful",
@@ -47,7 +47,7 @@ object ModelConfig {
     )
 
     /**
-     * Get display name for a model ID.
+     * Возвращает отображаемое имя для идентификатора модели.
      */
     fun getDisplayName(modelId: String): String {
         return MODEL_DISPLAY_NAMES[modelId] ?: modelId

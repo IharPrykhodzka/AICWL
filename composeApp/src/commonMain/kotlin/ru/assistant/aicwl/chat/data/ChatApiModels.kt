@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
- * Request body for chat completion API.
+ * Тело запроса для API завершения чата.
  */
 @Serializable
 data class ChatCompletionRequest(
@@ -13,7 +13,7 @@ data class ChatCompletionRequest(
 )
 
 /**
- * Single message in the conversation.
+ * Отдельное сообщение в разговоре.
  */
 @Serializable
 data class ChatMessage(
@@ -22,8 +22,8 @@ data class ChatMessage(
 )
 
 /**
- * Response from chat completion API.
- * For successful responses with choices.
+ * Ответ от API завершения чата.
+ * Для успешных ответов с вариантами (choices).
  */
 @Serializable
 data class ChatCompletionResponse(
@@ -47,7 +47,7 @@ data class Usage(
 )
 
 /**
- * API Error response format.
+ * Формат ответа об ошибке API.
  */
 @Serializable
 data class ChatApiErrorResponse(
@@ -62,7 +62,7 @@ data class ApiError(
 )
 
 /**
- * Chat message for UI state.
+ * Сообщение чата для UI-состояния.
  */
 data class UiChatMessage(
     val id: String,

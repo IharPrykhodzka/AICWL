@@ -17,8 +17,8 @@ import ru.assistant.aicwl.chat.data.ChatApiErrorResponse
 import ru.assistant.aicwl.chat.utils.createLogger
 
 /**
- * HTTP Client for communicating with Z.AI Chat API.
- * Handles authentication and JSON serialization.
+ * HTTP-клиент для взаимодействия с Z.AI Chat API.
+ * Обрабатывает аутентификацию и JSON-сериализацию.
  */
 class ChatApiClient {
     private val logger = createLogger("ChatApiClient")
@@ -30,36 +30,36 @@ class ChatApiClient {
     }
 
     private val client = HttpClient {
-        // HttpTimeout plugin with increased timeouts for slow AI models
+        // Плагин HttpTimeout с увеличенными таймаутами для медленных AI-моделей
         install(HttpTimeout) {
-            // Timeout for establishing connection
-            connectTimeoutMillis = 120_000  // 2 minutes
+            // Таймаут для установления соединения
+            connectTimeoutMillis = 120_000  // 2 минуты
 
-            // Total timeout for the entire request (waiting for response)
-            requestTimeoutMillis = 300_000   // 5 minutes
+            // Общий таймаут для всего запроса (ожидание ответа)
+            requestTimeoutMillis = 300_000   // 5 минут
 
-            // Socket timeout - time between received data packets
-            socketTimeoutMillis = 300_000    // 5 minutes
+            // Таймаут сокета - время между получаемыми пакетами данных
+            socketTimeoutMillis = 300_000    // 5 минут
         }
 
-        // Content negotiation for JSON
+        // Согласование содержимого для JSON
         install(ContentNegotiation) {
             json(json)
         }
     }
 
     /**
-     * Send a chat completion request with specified model.
+     * Отправляет запрос завершения чата с указанной моделью.
      *
-     * @param modelId The model identifier (e.g., "glm-4.7", "glm-4.6", "glm-4.5-air")
-     * @param messages List of chat messages in the conversation
-     * @return Result containing ChatCompletionResponse or error
+     * @param modelId Идентификатор модели (например, "glm-4.7", "glm-4.6", "glm-4.5-air")
+     * @param messages Список сообщений чата в разговоре
+     * @return Result содержащий ChatCompletionResponse или ошибку
      */
     suspend fun sendChatRequest(
         modelId: String,
         messages: List<ChatMessage>
     ): Result<ChatCompletionResponse> {
-        logger.i("Sending request to model: $modelId, messages count: ${messages.size}")
+        logger.i("Отправка запроса модели: $modelId, количество сообщений: ${messages.size}")
         logger.d("Endpoint: ${AppConfig.zApiEndpoint}")
 
         val request = ChatCompletionRequest(
@@ -67,17 +67,17 @@ class ChatApiClient {
             messages = messages
         )
 
-        // Debug: log request JSON
+        // Отладка: логируем JSON запроса
         val requestString = json.encodeToString(ChatCompletionRequest.serializer(), request)
         logger.d("Request JSON: $requestString")
 
         return try {
             val response: HttpResponse = client.post(AppConfig.zApiEndpoint) {
-                // Key headers for Z.AI API
+                // Основные заголовки для Z.AI API
                 header("Content-Type", "application/json")
                 header("Accept", "application/json")
                 header("Accept-Language", "en-US,en")
-                header("Authorization", AppConfig.zApiKey)  // WITHOUT "Bearer " prefix!
+                header("Authorization", AppConfig.zApiKey)  // БЕЗ префикса "Bearer "!
                 header("User-Agent", "AICWL/1.0")
 
                 logger.d("Request headers: Authorization=${maskApiKey(AppConfig.zApiKey)}")
@@ -85,15 +85,15 @@ class ChatApiClient {
                 setBody(request)
             }
 
-            // Get raw response body for logging
+            // Получаем сырой ответ для логирования
             val rawBody: String = response.bodyAsText()
             logger.d("Raw response (${response.status}): ${rawBody.take(500)}...")
 
-            // Check HTTP status
+            // Проверяем HTTP-статус
             if (!response.status.isSuccess()) {
                 logger.e("HTTP Error: ${response.status.value} - ${rawBody}")
 
-                // Try to parse error response
+                // Пытаемся распарсить ответ об ошибке
                 try {
                     val errorResponse = json.decodeFromString(ChatApiErrorResponse.serializer(), rawBody)
                     val errorMsg = errorResponse.error?.message ?: "HTTP ${response.status.value}"
@@ -103,10 +103,10 @@ class ChatApiClient {
                 }
             }
 
-            // Parse successful response
+            // Парсим успешный ответ
             val parsedResponse = json.decodeFromString(ChatCompletionResponse.serializer(), rawBody)
 
-            // Check if choices exist
+            // Проверяем наличие choices
             if (parsedResponse.choices.isNullOrEmpty()) {
                 logger.e("Response has no choices field. Raw: $rawBody")
                 return Result.failure(Exception("Invalid API response: 'choices' field is missing or empty"))
@@ -126,11 +126,11 @@ class ChatApiClient {
     }
 
     /**
-     * Send a simple user message and get the response.
+     * Отправляет простое пользовательское сообщение и получает ответ.
      *
-     * @param modelId The model identifier
-     * @param userMessage The user's message text
-     * @return Result containing ChatCompletionResponse or error
+     * @param modelId Идентификатор модели
+     * @param userMessage Текст сообщения пользователя
+     * @return Result содержащий ChatCompletionResponse или ошибку
      */
     suspend fun sendUserMessage(
         modelId: String,
@@ -146,7 +146,7 @@ class ChatApiClient {
     }
 
     /**
-     * Close the client when done.
+     * Закрывает клиент по завершении работы.
      */
     fun close() {
         logger.i("Closing HTTP client")
@@ -154,7 +154,7 @@ class ChatApiClient {
     }
 
     /**
-     * Mask API key for logging (show only first 8 and last 4 characters).
+     * Маскирует API-ключ для логирования (показывает только первые 8 и последние 4 символа).
      */
     private fun maskApiKey(key: String): String {
         return if (key.length > 12) {
@@ -166,6 +166,6 @@ class ChatApiClient {
 }
 
 /**
- * Singleton instance of the API client.
+ * Одиночный экземпляр (singleton) API-клиента.
  */
 val chatApiClient = ChatApiClient()

@@ -1,7 +1,7 @@
 package ru.assistant.aicwl.chat.utils
 
 /**
- * Cross-platform logger interface.
+ * Кроссплатформенный интерфейс логгера.
  */
 interface PlatformLogger {
     fun d(message: String)
@@ -12,7 +12,7 @@ interface PlatformLogger {
 }
 
 /**
- * Cross-platform logger factory.
- * Creates platform-specific loggers.
+ * Фабрика кроссплатформенного логгера.
+ * Создаёт платформенно-зависимые логгеры.
  */
 expect fun createLogger(tag: String): PlatformLogger

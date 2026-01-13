@@ -3,17 +3,17 @@ package ru.assistant.aicwl.chat.config
 import platform.Foundation.NSUserDefaults
 
 /**
- * Helper object for managing API key on iOS.
- * Can be used to set the API key programmatically.
+ * Вспомогательный объект для управления API-ключом на iOS.
+ * Может использоваться для программной установки API-ключа.
  */
 object ApiKeyHelper {
     private const val KEY = "LLM_Z_API_KEY"
 
     /**
-     * Set the API key programmatically (stored in UserDefaults).
-     * Call this before making any API requests.
+     * Устанавливает API-ключ программно (сохраняется в UserDefaults).
+     * Вызовите этот метод перед выполнением любых API-запросов.
      *
-     * Example:
+     * Пример:
      * ```kotlin
      * ApiKeyHelper.setApiKey("your-api-key-here")
      * ```
@@ -24,15 +24,15 @@ object ApiKeyHelper {
     }
 
     /**
-     * Get the currently stored API key from UserDefaults.
-     * Returns null if not set.
+     * Возвращает текущий сохранённый API-ключ из UserDefaults.
+     * Возвращает null, если ключ не установлен.
      */
     fun getApiKey(): String? {
         return NSUserDefaults.standardUserDefaults.stringForKey(KEY)
     }
 
     /**
-     * Clear the stored API key from UserDefaults.
+     * Удаляет сохранённый API-ключ из UserDefaults.
      */
     fun clearApiKey() {
         NSUserDefaults.standardUserDefaults.removeObjectForKey(KEY)

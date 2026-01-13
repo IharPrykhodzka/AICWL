@@ -5,9 +5,9 @@ import platform.Foundation.NSUserDefaults
 
 actual object AppConfig {
     actual val zApiKey: String by lazy {
-        // Try multiple sources for API key (in order of priority):
-        // 1. Local file (local_config.txt in bundle) - safest for git
-        // 2. UserDefaults (can be set programmatically)
+        // Пытаемся получить API-ключ из нескольких источников (в порядке приоритета):
+        // 1. Локальный файл (local_config.txt в бандле) - самый безопасный для git
+        // 2. UserDefaults (может быть установлен программно)
         // 3. Info.plist
 
         LocalConfigLoader.loadApiKeyFromFile()

@@ -3,9 +3,9 @@ package ru.assistant.aicwl.chat.ui
 import androidx.compose.runtime.Composable
 
 /**
- * Platform-specific ViewModel factory.
- * On Android: uses lifecycle ViewModel with proper scope.
- * On iOS/Desktop: uses remember for simple instance management.
+ * Платформенно-зависимая фабрика ViewModel.
+ * На Android: использует lifecycle ViewModel с правильным scope.
+ * На iOS/Desktop: использует remember для простого управления экземпляром.
  */
 @Composable
 expect fun chatViewModel(): ChatViewModel

@@ -16,7 +16,7 @@ actual object AppConfig {
         return try {
             val props = java.util.Properties()
 
-            // Try to find config.properties by searching upward from current directory
+            // Пытаемся найти config.properties, выполняя поиск вверх от текущей директории
             val configFile = findConfigFile() ?: return null
 
             configFile.inputStream().use { props.load(it) }
@@ -28,27 +28,27 @@ actual object AppConfig {
     }
 
     /**
-     * Search for config.properties in current directory and parent directories.
-     * This is needed because Desktop app runs from build/ directory.
+     * Ищет config.properties в текущей директории и родительских директориях.
+     * Это необходимо, поскольку Desktop-приложение запускается из директории build/.
      */
     private fun findConfigFile(): java.io.File? {
-        // Try multiple starting points
+        // Пробуем несколько начальных точек
         val searchPaths = listOf(
-            java.io.File(".").absoluteFile,  // Current directory
-            java.io.File("").absoluteFile,   // Working directory
-            java.io.File(System.getProperty("user.dir")),  // Explicit user.dir
-            java.io.File(System.getProperty("user.home"))  // User home directory
+            java.io.File(".").absoluteFile,  // Текущая директория
+            java.io.File("").absoluteFile,   // Рабочая директория
+            java.io.File(System.getProperty("user.dir")),  // Явный user.dir
+            java.io.File(System.getProperty("user.home"))  // Домашняя директория пользователя
         )
 
         for (startDir in searchPaths) {
             var currentDir = startDir
-            println("[AppConfig] Searching from: ${currentDir.absolutePath}")
+            println("[AppConfig] Поиск от: ${currentDir.absolutePath}")
 
-            // Search up to 8 levels up from this starting point
+            // Поднимаемся до 8 уровней вверх от этой начальной точки
             repeat(8) {
                 val configFile = java.io.File(currentDir, "config.properties")
                 if (configFile.exists()) {
-                    println("[AppConfig] Found config file at: ${configFile.absolutePath}")
+                    println("[AppConfig] Файл конфигурации найден: ${configFile.absolutePath}")
                     return configFile
                 }
                 val parent = currentDir.parentFile
@@ -57,14 +57,14 @@ actual object AppConfig {
             }
         }
 
-        // Also try checking if project root can be found via common markers
+        // Также пробуем найти корень проекта по общим маркерам
         var checkDir = java.io.File(".").absoluteFile
         repeat(10) {
             if (java.io.File(checkDir, "build.gradle.kts").exists() ||
                 java.io.File(checkDir, "settings.gradle.kts").exists()) {
                 val configFile = java.io.File(checkDir, "config.properties")
                 if (configFile.exists()) {
-                    println("[AppConfig] Found config file via gradle marker at: ${configFile.absolutePath}")
+                    println("[AppConfig] Файл конфигурации найден через gradle-маркер: ${configFile.absolutePath}")
                     return configFile
                 }
             }

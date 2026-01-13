@@ -1,27 +1,55 @@
 package ru.assistant.aicwl.chat.agent
 
+import ru.assistant.aicwl.chat.data.ChatMessage
 import ru.assistant.aicwl.chat.network.chatApiClient
+import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
 import ru.assistant.aicwl.chat.utils.createLogger
 
 /**
- * Simple Chat Agent that communicates with Z.AI API.
- * Supports dynamic model switching based on user selection.
+ * Агент чата, взаимодействующий с Z.AI API.
+ * Поддерживает динамическое переключение моделей на основе выбора пользователя.
+ * Автоматически добавляет системный промт ко всем запросам.
  */
 class ChatAgent {
     private val logger = createLogger("ChatAgent")
 
     /**
-     * Send a message to the AI using the specified model.
+     * Отправляет сообщение AI, используя указанную модель.
+     * Системный промт добавляется автоматически.
      *
-     * @param message User's message
-     * @param modelId Model to use for generating response
-     * @return AI's response text or error message
+     * @param message Сообщение пользователя
+     * @param modelId Модель для генерации ответа
+     * @param customSystemPrompt Опциональный кастомный системный промт (заменяет стандартный)
+     * @return Текст ответа AI или сообщение об ошибке
      */
-    suspend fun chat(message: String, modelId: String): String {
+    suspend fun chat(
+        message: String,
+        modelId: String,
+        customSystemPrompt: String? = null
+    ): String {
         logger.i("Chat requested. Model: $modelId")
         logger.d("User message length: ${message.length}")
 
-        val result = chatApiClient.sendUserMessage(modelId, message)
+        // Формируем список сообщений с системным промтом
+        val messages = buildList {
+            // Добавляем системный промт
+            add(
+                ChatMessage(
+                    role = "system",
+//                    content = customSystemPrompt ?: SystemPromptConfig.getSystemPrompt()
+                    content = SystemPromptConfig.getSystemPrompt()
+                )
+            )
+            // Добавляем сообщение пользователя
+            add(
+                ChatMessage(
+                    role = "user",
+                    content = message
+                )
+            )
+        }
+
+        val result = chatApiClient.sendChatRequest(modelId, messages)
 
         return result.fold(
             onSuccess = { response ->
@@ -38,7 +66,7 @@ class ChatAgent {
                 logger.e(errorMsg, exception)
                 logger.e("Exception type: ${exception::class.simpleName}")
 
-                // Provide user-friendly error messages
+                // Предоставляем понятные пользователю сообщения об ошибках
                 when {
                     exception.message?.contains("timeout", ignoreCase = true) == true ->
                         "Request timeout. The AI model is taking too long. Try the 'Fastest' model."
@@ -56,36 +84,74 @@ class ChatAgent {
     }
 
     /**
-     * Send a message with conversation history for context.
+     * Отправляет сообщение с историей разговора для контекста.
+     * Системный промт добавляется автоматически.
      *
-     * @param message User's message
-     * @param modelId Model to use
-     * @param conversationHistory Previous messages for context
-     * @return AI's response text
+     * @param message Сообщение пользователя
+     * @param modelId Модель для использования
+     * @param conversationHistory Предыдущие сообщения для контекста
+     * @param customSystemPrompt Опциональный кастомный системный промт
+     * @return Текст ответа AI
      */
     suspend fun chatWithHistory(
         message: String,
         modelId: String,
-        conversationHistory: List<String>
+        conversationHistory: List<String>,
+        customSystemPrompt: String? = null
     ): String {
         logger.i("Chat with history. Model: $modelId, History size: ${conversationHistory.size}")
 
-        val contextMessage = buildString {
-            if (conversationHistory.isNotEmpty()) {
-                append("Previous conversation:\n")
-                conversationHistory.forEach { append("  - $it\n") }
-                append("\nCurrent message: ")
+        // Формируем список сообщений с историей
+        val messages = buildList {
+            // Системный промт
+            add(
+                ChatMessage(
+                    role = "system",
+                    content = customSystemPrompt ?: SystemPromptConfig.getSystemPrompt()
+                )
+            )
+
+            // История разговора (попеременно user/assistant)
+            conversationHistory.forEach { historyMessage ->
+                // Для упрощения добавляем всё как пользовательские сообщения
+                // В будущем можно улучшить с разделением ролей
+                add(
+                    ChatMessage(
+                        role = "user",
+                        content = historyMessage
+                    )
+                )
             }
-            append(message)
+
+            // Текущее сообщение
+            add(
+                ChatMessage(
+                    role = "user",
+                    content = message
+                )
+            )
         }
 
-        logger.d("Context message length: ${contextMessage.length}")
+        logger.d("Total messages: ${messages.size}")
 
-        return chat(contextMessage, modelId)
+        val result = chatApiClient.sendChatRequest(modelId, messages)
+
+        return result.fold(
+            onSuccess = { response ->
+                val content = response.choices?.firstOrNull()?.message?.content
+                    ?: "No response from model"
+                logger.i("Response received. Length: ${content.length}")
+                content
+            },
+            onFailure = { exception ->
+                logger.e("Chat with history failed", exception)
+                "Error: ${exception.message ?: "Unknown error"}"
+            }
+        )
     }
 }
 
 /**
- * Singleton instance of the ChatAgent.
+ * Одиночный экземпляр (singleton) агента чата.
  */
 val chatAgent = ChatAgent()

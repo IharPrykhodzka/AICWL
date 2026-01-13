@@ -21,11 +21,15 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.assistant.aicwl.chat.config.ModelConfig
+import ru.assistant.aicwl.chat.data.EnhancedChatMessage
 import ru.assistant.aicwl.chat.data.MessageRole
+import ru.assistant.aicwl.chat.data.MessageType
 import ru.assistant.aicwl.chat.data.UiChatMessage
+import ru.assistant.aicwl.chat.ui.components.StructuredResponseCard
 
 /**
- * Main Chat Screen with model selector and message list.
+ * Главный экран чата с выбором модели и списком сообщений.
+ * Поддерживает структурированные ответы от AI.
  */
 @Composable
 fun ChatScreen(
@@ -34,10 +38,10 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // Auto-scroll to bottom when new messages arrive
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    // Автопрокрутка вниз при поступлении новых сообщений
+    LaunchedEffect(uiState.enhancedMessages.size) {
+        if (uiState.enhancedMessages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.enhancedMessages.size - 1)
         }
     }
 
@@ -55,20 +59,23 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Messages list
+            // Список сообщений
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(
-                    items = uiState.messages,
+                    items = uiState.enhancedMessages,
                     key = { it.id }
                 ) { message ->
-                    ChatMessageItem(message = message)
+                    EnhancedChatMessageItem(
+                        message = message,
+                        onSuggestionClick = { suggestion -> viewModel.sendSuggestion(suggestion) }
+                    )
                 }
 
                 if (uiState.isLoading) {
@@ -78,7 +85,7 @@ fun ChatScreen(
                 }
             }
 
-            // Input field
+            // Поле ввода
             ChatInputField(
                 inputText = uiState.inputText,
                 onInputChanged = { viewModel.updateInputText(it) },
@@ -90,7 +97,7 @@ fun ChatScreen(
 }
 
 /**
- * Top bar with model selector and clear button.
+ * Верхняя панель с выбором модели и кнопкой очистки.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,7 +123,7 @@ fun ChatTopBar(
             }
         },
         actions = {
-            // Model selector
+            // Селектор модели
             Box(modifier = Modifier.padding(end = 8.dp)) {
                 TextButton(
                     onClick = { expanded = true },
@@ -162,7 +169,7 @@ fun ChatTopBar(
                 }
             }
 
-            // Clear chat button
+            // Кнопка очистки чата
             IconButton(onClick = onClearChat) {
                 Icon(
                     imageVector = Icons.Default.Clear,
@@ -177,51 +184,113 @@ fun ChatTopBar(
 }
 
 /**
- * Individual chat message item.
+ * Элемент отдельного сообщения чата (устаревший, для обратной совместимости).
  */
 @Composable
 fun ChatMessageItem(message: UiChatMessage) {
+    EnhancedChatMessageItem(
+        message = EnhancedChatMessage(
+            id = message.id,
+            role = message.role,
+            originalContent = message.content,
+            timestamp = message.timestamp,
+            messageType = MessageType.PLAIN_TEXT
+        ),
+        onSuggestionClick = {}
+    )
+}
+
+/**
+ * Элемент расширенного сообщения чата с поддержкой структурированных ответов.
+ * Автоматически определяет, как отображать сообщение: как структурированную карточку
+ * или как обычный текст.
+ */
+@Composable
+fun EnhancedChatMessageItem(
+    message: EnhancedChatMessage,
+    onSuggestionClick: (String) -> Unit
+) {
     val isUser = message.role == MessageRole.USER
 
+    // Для пользователя - обычное сообщение
+    if (isUser) {
+        UserMessageBubble(
+            content = message.originalContent,
+            timestamp = message.timestamp
+        )
+        return
+    }
+
+    // Для AI - проверяем тип сообщения
+    when (message.messageType) {
+        MessageType.STRUCTURED -> {
+            // Структурированный ответ - отображаем карточку
+            message.structuredData?.let { structured ->
+                StructuredResponseCard(
+                    response = structured,
+                    onSuggestionClick = onSuggestionClick
+                )
+            } ?: run {
+                // Если structuredData == null, fallback на обычный текст
+                AssistantMessageBubble(
+                    content = message.originalContent,
+                    timestamp = message.timestamp
+                )
+            }
+        }
+        MessageType.ERROR -> {
+            // Сообщение об ошибке
+            ErrorMessageBubble(
+                content = message.originalContent,
+                timestamp = message.timestamp
+            )
+        }
+        else -> {
+            // Обычный текстовый ответ
+            AssistantMessageBubble(
+                content = message.originalContent,
+                timestamp = message.timestamp
+            )
+        }
+    }
+}
+
+/**
+ * Пузырь сообщения пользователя.
+ */
+@Composable
+private fun UserMessageBubble(
+    content: String,
+    timestamp: Long
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalArrangement = Arrangement.End
     ) {
         Box(
             modifier = Modifier
                 .widthIn(max = 280.dp)
                 .clip(
                     RoundedCornerShape(
-                        topStart = if (isUser) 12.dp else 4.dp,
-                        topEnd = if (isUser) 4.dp else 12.dp,
+                        topStart = 12.dp,
+                        topEnd = 4.dp,
                         bottomStart = 12.dp,
                         bottomEnd = 12.dp
                     )
                 )
-                .background(
-                    if (isUser)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
-                        MaterialTheme.colorScheme.secondaryContainer
-                )
+                .background(MaterialTheme.colorScheme.primaryContainer)
                 .padding(12.dp)
         ) {
             Column {
                 Text(
-                    text = message.content,
+                    text = content,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isUser)
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    else
-                        MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Text(
-                    text = formatTimestamp(message.timestamp),
+                    text = formatTimestamp(timestamp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isUser)
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    else
-                        MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -230,8 +299,96 @@ fun ChatMessageItem(message: UiChatMessage) {
 }
 
 /**
- * Input field with send button.
- * Enter to send, Shift+Enter for new line.
+ * Пузырь сообщения ассистента (обычный текст).
+ */
+@Composable
+private fun AssistantMessageBubble(
+    content: String,
+    timestamp: Long
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 4.dp,
+                        topEnd = 12.dp,
+                        bottomStart = 12.dp,
+                        bottomEnd = 12.dp
+                    )
+                )
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .padding(12.dp)
+        ) {
+            Column {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = formatTimestamp(timestamp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Пузырь сообщения об ошибке.
+ */
+@Composable
+private fun ErrorMessageBubble(
+    content: String,
+    timestamp: Long
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 4.dp,
+                        topEnd = 12.dp,
+                        bottomStart = 12.dp,
+                        bottomEnd = 12.dp
+                    )
+                )
+                .background(
+                    MaterialTheme.colorScheme.errorContainer
+                )
+                .padding(12.dp)
+        ) {
+            Column {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = formatTimestamp(timestamp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Поле ввода с кнопкой отправки.
+ * Enter для отправки, Shift+Enter для новой строки.
  */
 @Composable
 fun ChatInputField(
@@ -253,22 +410,22 @@ fun ChatInputField(
             modifier = Modifier
                 .weight(1f)
                 .onPreviewKeyEvent { keyEvent ->
-                    // Check if Enter key is pressed
+                    // Проверяем, нажата ли клавиша Enter
                     val isEnter = isEnterKeyPressed(keyEvent)
 
                     if (isEnter) {
-                        // Shift + Enter = new line (default behavior, return false to allow it)
+                        // Shift + Enter = новая строка (поведение по умолчанию, возвращаем false для разрешения)
                         if (keyEvent.isShiftPressed) {
-                            false  // Allow default behavior (new line)
+                            false  // Разрешаем поведение по умолчанию (новая строка)
                         } else {
-                            // Enter = send message
+                            // Enter = отправка сообщения
                             if (inputText.isNotBlank() && !isLoading) {
                                 onSend()
                             }
-                            true  // Consume the event (prevent new line)
+                            true  // Поглощаем событие (предотвращаем новую строку)
                         }
                     } else {
-                        false  // Allow other keys
+                        false  // Разрешаем другие клавиши
                     }
                 },
             placeholder = { Text("Type your message...") },
@@ -295,7 +452,7 @@ fun ChatInputField(
 }
 
 /**
- * Loading indicator for AI response.
+ * Индикатор загрузки для ответа AI.
  */
 @Composable
 fun LoadingIndicator() {
@@ -331,10 +488,10 @@ fun LoadingIndicator() {
 }
 
 /**
- * Format timestamp for display.
+ * Форматирует метку времени для отображения.
  */
 private fun formatTimestamp(timestamp: Long): String {
-    // Simple timestamp formatting - cross-platform
+    // Простое форматирование метки времени - кроссплатформенное
     val minutes = (timestamp / 60_000) % 60
     val hours = (timestamp / 3_600_000) % 24
     return "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}"

@@ -3,7 +3,7 @@ package ru.assistant.aicwl.chat.ui
 import androidx.compose.ui.input.key.KeyEvent
 
 /**
- * Check if the key event is an Enter key press.
- * Platform-specific implementation.
+ * Проверяет, является ли событие клавиши нажатием Enter.
+ * Платформенно-зависимая реализация.
  */
 expect fun isEnterKeyPressed(keyEvent: KeyEvent): Boolean

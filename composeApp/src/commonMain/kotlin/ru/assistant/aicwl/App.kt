@@ -6,8 +6,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import ru.assistant.aicwl.chat.ui.ChatScreen
 
 /**
- * Main application entry point.
- * Displays the ChatScreen with AI agent integration.
+ * Главная точка входа в приложение.
+ * Отображает ChatScreen с интеграцией AI-агента.
  */
 @Composable
 @Preview
