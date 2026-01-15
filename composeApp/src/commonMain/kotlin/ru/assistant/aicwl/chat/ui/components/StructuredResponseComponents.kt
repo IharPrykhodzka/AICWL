@@ -1,5 +1,6 @@
 package ru.assistant.aicwl.chat.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,9 +50,11 @@ fun StructuredResponseCard(
         ) {
             // Статус и категория
             StatusHeader(
-                status = response.status,
-                category = response.meta.category,
-                confidence = response.meta.confidence
+                status = response.computedStatus,
+                category = response.safeMeta.category,
+                confidence = response.safeMeta.confidence,
+                questionNumber = response.questionNumber,
+                totalQuestions = response.totalQuestions
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -60,7 +63,7 @@ fun StructuredResponseCard(
             SectionCard(
                 icon = Icons.Default.TaskAlt,
                 title = "Суть",
-                content = response.summary,
+                content = response.safeSummary,
                 color = MaterialTheme.colorScheme.primary
             )
 
@@ -73,6 +76,17 @@ fun StructuredResponseCard(
                     title = "Логика",
                     content = response.reasoning,
                     color = MaterialTheme.colorScheme.tertiary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Questions (уточняющие вопросы от бизнес-аналитика)
+            if (response.questions.isNotEmpty()) {
+                QuestionsSection(
+                    questions = response.questions,
+                    questionNumber = response.questionNumber,
+                    totalQuestions = response.totalQuestions,
+                    onQuestionClick = onSuggestionClick
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -118,14 +132,16 @@ fun StructuredResponseCard(
 private fun StatusHeader(
     status: ResponseStatus,
     category: String,
-    confidence: Double
+    confidence: Double,
+    questionNumber: Int? = null,
+    totalQuestions: Int? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Статус
+        // Статус с прогрессом вопросов если есть
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -137,6 +153,14 @@ private fun StatusHeader(
                 color = getStatusColor(status),
                 fontWeight = FontWeight.Medium
             )
+            // Индикатор прогресса для режима интервью
+            if (questionNumber != null && totalQuestions != null) {
+                Text(
+                    text = " ($questionNumber/$totalQuestions)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = getStatusColor(status).copy(alpha = 0.7f)
+                )
+            }
         }
 
         // Категория и уверенность
@@ -404,6 +428,122 @@ private fun SuggestionsSection(
                         text = suggestion,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Секция с уточняющими вопросами от бизнес-аналитика.
+ */
+@Composable
+private fun QuestionsSection(
+    questions: List<String>,
+    questionNumber: Int? = null,
+    totalQuestions: Int? = null,
+    onQuestionClick: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Заголовок с прогрессом
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Уточняющие вопросы:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+                fontWeight = FontWeight.Medium
+            )
+
+            // Индикатор прогресса
+            if (questionNumber != null && totalQuestions != null) {
+                Text(
+                    text = "$questionNumber из $totalQuestions",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Normal
+                )
+            }
+        }
+
+        // Прогресс-бар
+        if (questionNumber != null && totalQuestions != null) {
+            val progress = questionNumber.toFloat() / totalQuestions.toFloat()
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        questions.forEachIndexed { index, question ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onQuestionClick(question) },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // Номер вопроса (смещенный на основе questionNumber)
+                    val displayNumber = if (questionNumber != null) {
+                        questionNumber + index
+                    } else {
+                        index + 1
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.tertiary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$displayNumber",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Текст вопроса
+                    Text(
+                        text = question,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Иконка - можно ответить
+                    Icon(
+                        imageVector = Icons.Default.Help,
+                        contentDescription = "Ответить",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

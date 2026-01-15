@@ -8,13 +8,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Workspaces
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.assistant.aicwl.chat.config.ModelConfig
 import ru.assistant.aicwl.chat.data.EnhancedChatMessage
+import ru.assistant.aicwl.chat.utils.getClipboardManager
 import ru.assistant.aicwl.chat.data.MessageRole
 import ru.assistant.aicwl.chat.data.MessageType
 import ru.assistant.aicwl.chat.data.UiChatMessage
@@ -90,7 +95,9 @@ fun ChatScreen(
                 inputText = uiState.inputText,
                 onInputChanged = { viewModel.updateInputText(it) },
                 onSend = { viewModel.sendMessage() },
-                isLoading = uiState.isLoading
+                isLoading = uiState.isLoading,
+                isBusinessAnalystMode = uiState.isBusinessAnalystMode,
+                onBusinessAnalystModeToggle = { viewModel.toggleBusinessAnalystMode() }
             )
         }
     }
@@ -265,8 +272,17 @@ private fun UserMessageBubble(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Top
     ) {
+        // Кнопка копирования
+        CopyButton(
+            text_to_copy = content,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
         Box(
             modifier = Modifier
                 .widthIn(max = 280.dp)
@@ -308,7 +324,8 @@ private fun AssistantMessageBubble(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top
     ) {
         Box(
             modifier = Modifier
@@ -338,6 +355,14 @@ private fun AssistantMessageBubble(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Кнопка копирования
+        CopyButton(
+            text_to_copy = content,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -351,7 +376,8 @@ private fun ErrorMessageBubble(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top
     ) {
         Box(
             modifier = Modifier
@@ -383,6 +409,14 @@ private fun ErrorMessageBubble(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Кнопка копирования
+        CopyButton(
+            text_to_copy = content,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -395,7 +429,9 @@ fun ChatInputField(
     inputText: String,
     onInputChanged: (String) -> Unit,
     onSend: () -> Unit,
-    isLoading: Boolean
+    isLoading: Boolean,
+    isBusinessAnalystMode: Boolean = false,
+    onBusinessAnalystModeToggle: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -404,6 +440,12 @@ fun ChatInputField(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Переключатель режима бизнес-аналитика
+        BusinessAnalystToggleButton(
+            is_enabled = isBusinessAnalystMode,
+            on_toggle = onBusinessAnalystModeToggle
+        )
+
         OutlinedTextField(
             value = inputText,
             onValueChange = onInputChanged,
@@ -428,16 +470,32 @@ fun ChatInputField(
                         false  // Разрешаем другие клавиши
                     }
                 },
-            placeholder = { Text("Type your message...") },
+            placeholder = {
+                Text(
+                    if (isBusinessAnalystMode) "Опишите вашу идею для ТЗ..."
+                    else "Type your message..."
+                )
+            },
             enabled = !isLoading,
             maxLines = 4,
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(24.dp),
+            colors = if (isBusinessAnalystMode) {
+                OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                    focusedLabelColor = MaterialTheme.colorScheme.tertiary
+                )
+            } else {
+                OutlinedTextFieldDefaults.colors()
+            }
         )
 
         FloatingActionButton(
             onClick = { if (inputText.isNotBlank() && !isLoading) onSend() },
             modifier = Modifier.size(48.dp),
-            containerColor = MaterialTheme.colorScheme.primary
+            containerColor = if (isBusinessAnalystMode)
+                MaterialTheme.colorScheme.tertiary
+            else
+                MaterialTheme.colorScheme.primary
         ) {
             Icon(
                 imageVector = Icons.Default.Send,
@@ -495,4 +553,112 @@ private fun formatTimestamp(timestamp: Long): String {
     val minutes = (timestamp / 60_000) % 60
     val hours = (timestamp / 3_600_000) % 24
     return "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}"
+}
+
+/**
+ * Переключатель режима бизнес-аналитика.
+ * Иконка с индикацией активного режима.
+ */
+@Composable
+private fun BusinessAnalystToggleButton(
+    is_enabled: Boolean,
+    on_toggle: () -> Unit
+) {
+    val container_color = if (is_enabled)
+        MaterialTheme.colorScheme.tertiaryContainer
+    else
+        MaterialTheme.colorScheme.surfaceVariant
+
+    val content_color = if (is_enabled)
+        MaterialTheme.colorScheme.onTertiaryContainer
+    else
+        MaterialTheme.colorScheme.onSurfaceVariant
+
+    IconButton(
+        onClick = on_toggle,
+        modifier = Modifier.size(48.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Фон с индикатором
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(container_color)
+                    .then(
+                        if (is_enabled) {
+                            Modifier
+                        } else {
+                            Modifier
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Workspaces,
+                    contentDescription = if (is_enabled) "Выключить режим бизнес-аналитика"
+                    else "Включить режим бизнес-аналитика",
+                    tint = content_color,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            // Индикатор активного режима (точка)
+            if (is_enabled) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(12.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.tertiary)
+                        .padding(1.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.White)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Кнопка копирования текста в буфер обмена.
+ */
+@Composable
+private fun CopyButton(
+    text_to_copy: String,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    var show_copied_feedback by remember { mutableStateOf(false) }
+
+    IconButton(
+        onClick = {
+            getClipboardManager().setText(text_to_copy)
+            show_copied_feedback = true
+        },
+        modifier = Modifier.size(32.dp)
+    ) {
+        Icon(
+            imageVector = if (show_copied_feedback) Icons.Default.Check else Icons.Default.ContentCopy,
+            contentDescription = if (show_copied_feedback) "Скопировано" else "Копировать",
+            tint = if (show_copied_feedback) MaterialTheme.colorScheme.primary else tint,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+
+    // Сбросить состояние через 2 секунды
+    LaunchedEffect(show_copied_feedback) {
+        if (show_copied_feedback) {
+            kotlinx.coroutines.delay(2000)
+            show_copied_feedback = false
+        }
+    }
 }

@@ -18,7 +18,8 @@ data class ChatCompletionRequest(
 @Serializable
 data class ChatMessage(
     val role: String,  // "user", "assistant", "system"
-    val content: String
+    val content: String,
+    val reasoning_content: String? = null  // Для моделей с chain-of-thought
 )
 
 /**
@@ -75,4 +76,29 @@ enum class MessageRole {
     USER,
     ASSISTANT,
     SYSTEM
+}
+
+/**
+ * Запись истории для режима бизнес-аналитика.
+ * Хранит сообщение с его ролью для правильного контекста.
+ */
+data class InterviewHistoryEntry(
+    val role: MessageRole,
+    val content: String,
+    val questionNumber: Int? = null,      // Номер вопроса если это вопрос от ассистента
+    val totalQuestions: Int? = null       // Общее количество вопросов если известно
+) {
+    /**
+     * Преобразует запись в ChatMessage для API.
+     */
+    fun toChatMessage(): ChatMessage {
+        return ChatMessage(
+            role = when (role) {
+                MessageRole.USER -> "user"
+                MessageRole.ASSISTANT -> "assistant"
+                MessageRole.SYSTEM -> "system"
+            },
+            content = content
+        )
+    }
 }
