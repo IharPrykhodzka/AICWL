@@ -38,7 +38,7 @@ object SystemPromptConfig {
      * Основной системный промт с JSON-форматом.
      * Это всегда первое и главное правило для AI.
      */
-    private val mainPrompt = """
+    val mainPrompt = """
 Ты — универсальный интеллектуальный ассистент. Твоя задача — отвечать на вопросы пользователя максимально полезно.
 
 КРИТИЧЕСКИ ВАЖНО - ФОРМАТ ОТВЕТА:
@@ -49,9 +49,6 @@ object SystemPromptConfig {
 
 Формат ответа (пример):
 {
-  "summary": "Краткий ответ одной фразой",
-  "reasoning": "Краткое пояснение логики",
-  "action_items": ["Действие 1", "Действие 2"],
   "content": "Развернутый ответ",
   "highlights": ["Ключевая мысль 1", "Ключевая мысль 2"],
   "suggestions": ["Вопрос 1", "Вопрос 2"],
@@ -62,17 +59,59 @@ object SystemPromptConfig {
 }
 
 Правила полей:
-- summary: Максимально короткая суть ответа
-- reasoning: Почему ты так решил
-- action_items: Конкретные шаги (если применимо)
 - content: Основной развернутый ответ
 - highlights: 2-3 главные мысли
-- suggestions: 2-3 вопроса для продолжения диалога
+- suggestions: 2-3 вопроса для продолжения диалога от лица пользователя к ИИ агенту
 - meta.category: Тема ответа
 - meta.confidence: Уверенность от 0.0 до 1.0
 
 Отвечай на том же языке, что и пользователь.
 """.trimIndent()
+
+    /**
+     * Текущий кастомный промпт (загружается из preferences).
+     * Если null, используется mainPrompt.
+     */
+    private var customPrompt: String? = null
+
+    /**
+     * Загружает кастомный промпт из preferences.
+     * Должен вызываться при инициализации приложения.
+     */
+    suspend fun loadCustomPrompt(repository: ru.assistant.aicwl.chat.prompt.data.PromptSettingsRepository) {
+        refreshFromRepository(repository)
+    }
+
+    /**
+     * Обновляет состояние SystemPromptConfig из repository.
+     * Синхронизирует customPrompt и additionalRules с сохранёнными данными.
+     * Должен вызываться после любых изменений в настройках промта.
+     *
+     * @param repository Repository для загрузки актуальных настроек
+     */
+    suspend fun refreshFromRepository(repository: ru.assistant.aicwl.chat.prompt.data.PromptSettingsRepository) {
+        val settings = repository.getSettings()
+        customPrompt = settings.customMainPrompt
+
+        // Загружаем и применяем сохранённые правила
+        clearAdditionalRules()
+        settings.additionalRules.forEach { ruleData ->
+            addRule(SimplePromptRule(ruleData.text, ruleData.enabled))
+        }
+    }
+
+    /**
+     * Устанавливает кастомный промпт.
+     */
+    fun setCustomPrompt(text: String) {
+        customPrompt = if (text.isNotBlank()) text else null
+    }
+
+    /**
+     * Возвращает текущий основной промпт (кастомный или дефолтный).
+     */
+    private fun getCurrentMainPrompt(): String =
+        if (customPrompt.isNullOrBlank()) mainPrompt else customPrompt!!
 
     /**
      * Специальный системный промт для режима бизнес-аналитика.
@@ -173,7 +212,7 @@ object SystemPromptConfig {
         } else {
             // Стандартный режим с основным промтом и дополнительными правилами
             buildString {
-                append(mainPrompt)
+                append(getCurrentMainPrompt())
 
                 val enabledAdditionalRules = additionalRules.filter { it.isEnabled() }
                 if (enabledAdditionalRules.isNotEmpty()) {

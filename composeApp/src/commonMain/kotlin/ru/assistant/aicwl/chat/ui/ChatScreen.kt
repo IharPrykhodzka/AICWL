@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Workspaces
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +32,11 @@ import ru.assistant.aicwl.chat.data.MessageRole
 import ru.assistant.aicwl.chat.data.MessageType
 import ru.assistant.aicwl.chat.data.UiChatMessage
 import ru.assistant.aicwl.chat.ui.components.StructuredResponseCard
+import ru.assistant.aicwl.chat.prompt.ui.PromptSettingsViewModel
+import ru.assistant.aicwl.chat.prompt.ui.PromptSettingsViewModelFactory
+import ru.assistant.aicwl.chat.prompt.ui.components.PromptSettingsScreen
+import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
+import kotlinx.coroutines.launch
 
 /**
  * Главный экран чата с выбором модели и списком сообщений.
@@ -43,62 +49,113 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // Автопрокрутка вниз при поступлении новых сообщений
-    LaunchedEffect(uiState.enhancedMessages.size) {
-        if (uiState.enhancedMessages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.enhancedMessages.size - 1)
+    // Navigation state
+    var showSettingsScreen by remember { mutableStateOf(false) }
+
+    // Load custom prompt on composition
+    LaunchedEffect(Unit) {
+        try {
+            SystemPromptConfig.loadCustomPrompt(
+                PromptSettingsViewModelFactory.getRepository()
+            )
+        } catch (e: Exception) {
+            // Handle initialization error silently
         }
     }
 
-    Scaffold(
-        topBar = {
-            ChatTopBar(
-                selectedModel = uiState.selectedModel,
-                onModelSelected = { viewModel.selectModel(it) },
-                onClearChat = { viewModel.clearChat() }
+    // Show settings screen or chat screen
+    if (showSettingsScreen) {
+        // Settings screen with its own ViewModel
+        val coroutineScope = rememberCoroutineScope()
+        val settingsViewModel: PromptSettingsViewModel = remember {
+            PromptSettingsViewModelFactory.create(
+                coroutineScope = coroutineScope
             )
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Список сообщений
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = uiState.enhancedMessages,
-                    key = { it.id }
-                ) { message ->
-                    EnhancedChatMessageItem(
-                        message = message,
-                        onSuggestionClick = { suggestion -> viewModel.sendSuggestion(suggestion) }
-                    )
-                }
+        val settingsUiState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+        val editedPrompt by settingsViewModel.editedPrompt.collectAsStateWithLifecycle()
+        val newRuleText by settingsViewModel.newRuleText.collectAsStateWithLifecycle()
 
-                if (uiState.isLoading) {
-                    item {
-                        LoadingIndicator()
+        PromptSettingsScreen(
+            uiState = settingsUiState,
+            editedPrompt = editedPrompt,
+            newRuleText = newRuleText,
+            onPromptChanged = { settingsViewModel.onPromptTextChanged(it) },
+            onNewRuleTextChanged = { settingsViewModel.onNewRuleTextChanged(it) },
+            onSave = {
+                settingsViewModel.savePrompt()
+                // Update SystemPromptConfig with new custom prompt
+                SystemPromptConfig.setCustomPrompt(editedPrompt)
+            },
+            onReset = {
+                settingsViewModel.resetToDefault()
+                SystemPromptConfig.setCustomPrompt("")
+            },
+            onAddRule = { settingsViewModel.addRule() },
+            onRemoveRule = { settingsViewModel.removeRule(it) },
+            onClearRules = { settingsViewModel.clearAllRules() },
+            onBack = { showSettingsScreen = false },
+            onClearError = { settingsViewModel.clearError() }
+        )
+    } else {
+        // Chat screen
+        LaunchedEffect(uiState.enhancedMessages.size) {
+            if (uiState.enhancedMessages.isNotEmpty()) {
+                listState.animateScrollToItem(uiState.enhancedMessages.size - 1)
+            }
+        }
+
+        Scaffold(
+            topBar = {
+                ChatTopBar(
+                    selectedModel = uiState.selectedModel,
+                    onModelSelected = { viewModel.selectModel(it) },
+                    onClearChat = { viewModel.clearChat() },
+                    onSettingsClick = { showSettingsScreen = true }
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Список сообщений
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = uiState.enhancedMessages,
+                        key = { it.id }
+                    ) { message ->
+                        EnhancedChatMessageItem(
+                            message = message,
+                            onSuggestionClick = { suggestion -> viewModel.sendSuggestion(suggestion) }
+                        )
+                    }
+
+                    if (uiState.isLoading) {
+                        item {
+                            LoadingIndicator()
+                        }
                     }
                 }
-            }
 
-            // Поле ввода
-            ChatInputField(
-                inputText = uiState.inputText,
-                onInputChanged = { viewModel.updateInputText(it) },
-                onSend = { viewModel.sendMessage() },
-                isLoading = uiState.isLoading,
-                isBusinessAnalystMode = uiState.isBusinessAnalystMode,
-                onBusinessAnalystModeToggle = { viewModel.toggleBusinessAnalystMode() }
-            )
+                // Поле ввода
+                ChatInputField(
+                    inputText = uiState.inputText,
+                    onInputChanged = { viewModel.updateInputText(it) },
+                    onSend = { viewModel.sendMessage() },
+                    isLoading = uiState.isLoading,
+                    isBusinessAnalystMode = uiState.isBusinessAnalystMode,
+                    onBusinessAnalystModeToggle = { viewModel.toggleBusinessAnalystMode() }
+                )
+            }
         }
     }
 }
@@ -111,7 +168,8 @@ fun ChatScreen(
 fun ChatTopBar(
     selectedModel: String,
     onModelSelected: (String) -> Unit,
-    onClearChat: () -> Unit
+    onClearChat: () -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -181,6 +239,14 @@ fun ChatTopBar(
                 Icon(
                     imageVector = Icons.Default.Clear,
                     contentDescription = "Clear chat"
+                )
+            }
+
+            // Кнопка настроек промпта
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Prompt settings"
                 )
             }
         },
