@@ -78,3 +78,31 @@ class ClearPromptRulesUseCase(
         SystemPromptConfig.refreshFromRepository(repository)
     }
 }
+
+/**
+ * Use case for toggling chat history persistence.
+ *
+ * Domain layer - business logic for chat history settings.
+ */
+class ToggleChatHistoryUseCase(
+    private val repository: PromptSettingsRepository
+) {
+    suspend operator fun invoke(enabled: Boolean) {
+        val currentSettings = repository.getSettings()
+        val updatedSettings = currentSettings.copy(saveChatHistory = enabled)
+        repository.saveSettings(updatedSettings)
+    }
+}
+
+/**
+ * Use case for clearing chat history.
+ *
+ * Domain layer - business logic for clearing persisted chat history.
+ */
+class ClearChatHistoryUseCase(
+    private val chatHistoryRepository: ru.assistant.aicwl.chat.data.ChatHistoryRepository
+) {
+    suspend operator fun invoke() {
+        chatHistoryRepository.clearChatHistory()
+    }
+}

@@ -17,20 +17,24 @@ class PromptSettingsRepositoryImpl(
     override fun getSettingsFlow(): Flow<PromptSettings> =
         combine(
             preferences.getCustomPromptFlow(),
-            preferences.getAdditionalRulesFlow()
-        ) { customPrompt, rulesJson ->
+            preferences.getAdditionalRulesFlow(),
+            preferences.getSaveChatHistoryFlow()
+        ) { customPrompt, rulesJson, saveChatHistory ->
             PromptSettings(
                 customMainPrompt = customPrompt,
-                additionalRules = deserializeRules(rulesJson)
+                additionalRules = deserializeRules(rulesJson),
+                saveChatHistory = saveChatHistory
             )
         }
 
     override suspend fun getSettings(): PromptSettings {
         val customPrompt = preferences.getCustomPrompt()
         val rulesJson = preferences.getAdditionalRules()
+        val saveChatHistory = preferences.getSaveChatHistory()
         return PromptSettings(
             customMainPrompt = customPrompt,
-            additionalRules = deserializeRules(rulesJson)
+            additionalRules = deserializeRules(rulesJson),
+            saveChatHistory = saveChatHistory
         )
     }
 
@@ -47,6 +51,8 @@ class PromptSettingsRepositoryImpl(
         } else {
             preferences.clearAdditionalRules()
         }
+
+        preferences.setSaveChatHistory(settings.saveChatHistory)
     }
 
     override suspend fun saveCustomPrompt(prompt: String) {

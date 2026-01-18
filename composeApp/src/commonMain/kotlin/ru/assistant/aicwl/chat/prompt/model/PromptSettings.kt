@@ -20,7 +20,8 @@ data class PromptRuleData(
 @Serializable
 data class PromptSettings(
     val customMainPrompt: String? = null,
-    val additionalRules: List<PromptRuleData> = emptyList()
+    val additionalRules: List<PromptRuleData> = emptyList(),
+    val saveChatHistory: Boolean = true  // Default to true for better UX
 ) {
     /**
      * Checks if a custom main prompt is set.

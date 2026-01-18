@@ -9,6 +9,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import ru.assistant.aicwl.chat.utils.initAppContext
 import ru.assistant.aicwl.chat.prompt.ui.PromptSettingsViewModelFactory
 import ru.assistant.aicwl.chat.prompt.data.PromptPreferences
+import ru.assistant.aicwl.chat.data.ChatHistoryPreferences
+import ru.assistant.aicwl.chat.ui.initializeChatViewModelFactory
 import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
 
 class MainActivity : ComponentActivity() {
@@ -23,10 +25,20 @@ class MainActivity : ComponentActivity() {
         val preferences = PromptPreferences()
         preferences.initialize(applicationContext)
 
+        // Инициализируем preferences для истории чата
+        val chatHistoryPrefs = ChatHistoryPreferences()
+        chatHistoryPrefs.initialize(applicationContext)
+
         // Инициализируем фабрику настроек промпта
         PromptSettingsViewModelFactory.initialize(
             defaultPrompt = SystemPromptConfig.mainPrompt,
-            preferences = preferences
+            preferences = preferences,
+            chatHistoryPrefs = chatHistoryPrefs
+        )
+
+        // Инициализируем фабрику ChatViewModel
+        initializeChatViewModelFactory(
+            PromptSettingsViewModelFactory.getChatHistoryRepository()
         )
 
         setContent {

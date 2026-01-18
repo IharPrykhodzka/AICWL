@@ -15,6 +15,7 @@ actual class PromptPreferences actual constructor() {
         const val PREFS_NAME = "prompt_settings"
         const val KEY_CUSTOM_PROMPT = "custom_main_prompt"
         const val KEY_ADDITIONAL_RULES = "additional_rules"
+        const val KEY_SAVE_CHAT_HISTORY = "save_chat_history"
     }
 
     private lateinit var prefs: SharedPreferences
@@ -73,5 +74,27 @@ actual class PromptPreferences actual constructor() {
 
     actual suspend fun clearAdditionalRules() {
         prefs.edit().remove(KEY_ADDITIONAL_RULES).apply()
+    }
+
+    actual fun getSaveChatHistoryFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_SAVE_CHAT_HISTORY) {
+                trySend(prefs.getBoolean(KEY_SAVE_CHAT_HISTORY, true))
+            }
+        }
+
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(prefs.getBoolean(KEY_SAVE_CHAT_HISTORY, true))
+
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }.distinctUntilChanged()
+
+    actual suspend fun getSaveChatHistory(): Boolean =
+        prefs.getBoolean(KEY_SAVE_CHAT_HISTORY, true)
+
+    actual suspend fun setSaveChatHistory(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SAVE_CHAT_HISTORY, enabled).apply()
     }
 }

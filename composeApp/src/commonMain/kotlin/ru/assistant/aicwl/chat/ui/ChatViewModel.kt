@@ -21,11 +21,17 @@ import ru.assistant.aicwl.chat.utils.createLogger
  * ViewModel для управления состоянием чата и взаимодействиями.
  * Поддерживает структурированные ответы от AI.
  */
-class ChatViewModel : ViewModel() {
+class ChatViewModel(
+    private val chatHistoryRepository: ru.assistant.aicwl.chat.data.ChatHistoryRepository
+) : ViewModel() {
     private val logger = createLogger("ChatViewModel")
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    init {
+        loadChatHistory()
+    }
 
     /**
      * Обновляет выбранную AI-модель.
@@ -100,10 +106,23 @@ class ChatViewModel : ViewModel() {
                         fixedTotalQuestions = _uiState.value.fixedTotalQuestions
                     )
                 } else {
-                    // Обычный режим - без истории
-                    chatAgent.chat(
+                    // Обычный режим - с историей сообщений для контекста
+                    // Исключаем последнее сообщение (текущий ввод пользователя) так как оно будет добавлено в chatWithHistory
+                    val conversationHistory = _uiState.value.enhancedMessages
+                        .dropLast(1)  // Убираем текущее сообщение пользователя из истории
+                        .map { msg ->
+                            ru.assistant.aicwl.chat.data.InterviewHistoryEntry(
+                                role = msg.role,
+                                content = msg.originalContent
+                            )
+                        }
+
+                    logger.d("Sending chat with history. Previous messages: ${conversationHistory.size}, Current: ${currentInput.take(50)}...")
+
+                    chatAgent.chatWithHistory(
                         message = currentInput,
-                        modelId = _uiState.value.selectedModel
+                        modelId = _uiState.value.selectedModel,
+                        conversationHistory = conversationHistory
                     )
                 }
 
@@ -185,6 +204,9 @@ class ChatViewModel : ViewModel() {
 
                 logger.d("Assistant message added. Total messages: ${_uiState.value.enhancedMessages.size}")
                 logger.d("Business analyst history size: ${newHistory.size}")
+
+                // Auto-save chat history after successful message
+                saveChatHistory()
             } catch (e: Exception) {
                 logger.e("Failed to get AI response", e)
 
@@ -222,6 +244,64 @@ class ChatViewModel : ViewModel() {
             businessAnalystHistory = emptyList(),
             fixedTotalQuestions = null
         )
+    }
+
+    /**
+     * Загружает историю чата при инициализации.
+     * Вызывается автоматически в init блоке если история включена.
+     */
+    private fun loadChatHistory() {
+        viewModelScope.launch {
+            try {
+                val isEnabled = chatHistoryRepository.isChatHistoryEnabled()
+                logger.i("Chat history enabled: $isEnabled")
+
+                if (isEnabled) {
+                    val history = chatHistoryRepository.getChatHistory()
+                    if (history != null) {
+                        logger.i("Loaded chat history with ${history.messages.size} messages")
+                        _uiState.value = _uiState.value.copy(
+                            enhancedMessages = history.messages.map { it.toDomain() },
+                            businessAnalystHistory = history.businessAnalystHistory.map { it.toDomain() },
+                            fixedTotalQuestions = history.fixedTotalQuestions
+                        )
+                    } else {
+                        logger.i("No saved chat history found")
+                    }
+                }
+            } catch (e: Exception) {
+                logger.e("Failed to load chat history", e)
+            }
+        }
+    }
+
+    /**
+     * Сохраняет текущую историю чата.
+     * Вызывается автоматически после каждого нового сообщения если история включена.
+     */
+    private suspend fun saveChatHistory() {
+        try {
+            val isEnabled = chatHistoryRepository.isChatHistoryEnabled()
+            if (!isEnabled) {
+                logger.d("Chat history is disabled, skipping save")
+                return
+            }
+
+            val history = ru.assistant.aicwl.chat.data.ChatHistoryData(
+                messages = _uiState.value.enhancedMessages.map {
+                    ru.assistant.aicwl.chat.data.SerializableChatMessage.fromDomain(it)
+                },
+                businessAnalystHistory = _uiState.value.businessAnalystHistory.map {
+                    ru.assistant.aicwl.chat.data.SerializableInterviewEntry.fromDomain(it)
+                },
+                fixedTotalQuestions = _uiState.value.fixedTotalQuestions
+            )
+
+            chatHistoryRepository.saveChatHistory(history)
+            logger.d("Chat history saved with ${history.messages.size} messages")
+        } catch (e: Exception) {
+            logger.e("Failed to save chat history", e)
+        }
     }
 
     /**

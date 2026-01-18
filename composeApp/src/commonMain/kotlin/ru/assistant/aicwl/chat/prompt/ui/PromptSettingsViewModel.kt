@@ -24,6 +24,8 @@ class PromptSettingsViewModel(
     private val removeRuleUseCase: RemovePromptRuleUseCase,
     private val resetPromptUseCase: ResetPromptUseCase,
     private val clearRulesUseCase: ClearPromptRulesUseCase,
+    private val toggleChatHistoryUseCase: ToggleChatHistoryUseCase,
+    private val clearChatHistoryUseCase: ClearChatHistoryUseCase,
     private val defaultMainPrompt: String,
     coroutineScope: CoroutineScope? = null
 ) {
@@ -54,7 +56,8 @@ class PromptSettingsViewModel(
                     customPrompt = settings.customMainPrompt,
                     additionalRules = settings.additionalRules,
                     isUsingCustomPrompt = settings.hasCustomPrompt(),
-                    effectivePrompt = settings.getEffectivePrompt(defaultMainPrompt)
+                    effectivePrompt = settings.getEffectivePrompt(defaultMainPrompt),
+                    saveChatHistory = settings.saveChatHistory
                 )
             } catch (e: Exception) {
                 _uiState.value = PromptSettingsUiState.Error(e.message ?: "Failed to load settings")
@@ -137,6 +140,28 @@ class PromptSettingsViewModel(
             loadSettings()
         }
     }
+
+    fun toggleChatHistory(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                toggleChatHistoryUseCase(enabled)
+                loadSettings()
+            } catch (e: Exception) {
+                _uiState.value = PromptSettingsUiState.Error(e.message ?: "Failed to update chat history setting")
+            }
+        }
+    }
+
+    fun clearChatHistory() {
+        viewModelScope.launch {
+            try {
+                clearChatHistoryUseCase()
+                // Show success or refresh state as needed
+            } catch (e: Exception) {
+                _uiState.value = PromptSettingsUiState.Error(e.message ?: "Failed to clear chat history")
+            }
+        }
+    }
 }
 
 /**
@@ -150,7 +175,8 @@ sealed class PromptSettingsUiState {
         val customPrompt: String?,
         val additionalRules: List<PromptRuleData>,
         val isUsingCustomPrompt: Boolean,
-        val effectivePrompt: String
+        val effectivePrompt: String,
+        val saveChatHistory: Boolean = true
     ) : PromptSettingsUiState()
 
     data class Error(val message: String) : PromptSettingsUiState()

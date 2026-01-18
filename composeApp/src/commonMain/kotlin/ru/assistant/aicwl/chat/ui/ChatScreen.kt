@@ -94,6 +94,8 @@ fun ChatScreen(
             onAddRule = { settingsViewModel.addRule() },
             onRemoveRule = { settingsViewModel.removeRule(it) },
             onClearRules = { settingsViewModel.clearAllRules() },
+            onToggleChatHistory = { enabled -> settingsViewModel.toggleChatHistory(enabled) },
+            onClearChatHistory = { settingsViewModel.clearChatHistory() },
             onBack = { showSettingsScreen = false },
             onClearError = { settingsViewModel.clearError() }
         )

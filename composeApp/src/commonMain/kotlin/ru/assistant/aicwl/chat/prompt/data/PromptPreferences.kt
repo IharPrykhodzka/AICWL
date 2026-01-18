@@ -46,4 +46,19 @@ expect class PromptPreferences() {
      * Clear all additional rules.
      */
     suspend fun clearAdditionalRules()
+
+    /**
+     * Observe save chat history setting changes.
+     */
+    fun getSaveChatHistoryFlow(): Flow<Boolean>
+
+    /**
+     * Get current save chat history setting (default true).
+     */
+    suspend fun getSaveChatHistory(): Boolean
+
+    /**
+     * Save chat history setting.
+     */
+    suspend fun setSaveChatHistory(enabled: Boolean)
 }
