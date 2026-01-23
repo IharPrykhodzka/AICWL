@@ -1,18 +1,37 @@
 package ru.assistant.aicwl.chat.agent
 
-import ru.assistant.aicwl.chat.data.ChatMessage
+import ru.assistant.aicwl.chat.data.ChatRequestParameters
 import ru.assistant.aicwl.chat.data.InterviewHistoryEntry
-import ru.assistant.aicwl.chat.network.chatApiClient
+import ru.assistant.aicwl.chat.data.unified.UnifiedChatMessage
+import ru.assistant.aicwl.chat.data.unified.UnifiedChatRequest
+import ru.assistant.aicwl.chat.data.unified.MessageRole
+import ru.assistant.aicwl.chat.provider.AIProviderFactory
+import ru.assistant.aicwl.chat.provider.ProviderType
 import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
 import ru.assistant.aicwl.chat.utils.createLogger
 
 /**
- * Агент чата, взаимодействующий с Z.AI API.
- * Поддерживает динамическое переключение моделей на основе выбора пользователя.
- * Автоматически добавляет системный промт ко всем запросам.
+ * Агент чата с поддержкой множественных AI-провайдеров.
+ * Поддерживает динамическое переключение между Z.ai, OpenAI и Anthropic.
+ *
+ * Для обратной совместимости сохраняет старый API с modelId: String,
+ * но рекомендуется использовать новые методы с ProviderType.
  */
 class ChatAgent {
     private val logger = createLogger("ChatAgent")
+
+    /**
+     * Определяет провайдер по ID модели.
+     * Для обратной совместимости со старым кодом.
+     */
+    private fun inferProviderFromModel(modelId: String): ProviderType {
+        return when {
+            modelId.startsWith("glm-") -> ProviderType.ZAI
+            modelId.startsWith("gpt-") -> ProviderType.OPENAI
+            modelId.contains("claude") -> ProviderType.ANTHROPIC
+            else -> ProviderType.DEFAULT
+        }
+    }
 
     /**
      * Отправляет сообщение AI, используя указанную модель.
@@ -20,88 +39,70 @@ class ChatAgent {
      *
      * @param message Сообщение пользователя
      * @param modelId Модель для генерации ответа
-     * @param customSystemPrompt Опциональный кастомный системный промт (заменяет стандартный)
+     * @param parameters Параметры генерации (temperature, maxTokens, и т.д.)
+     * @param customSystemPrompt Опциональный кастомный системный промт
      * @return Текст ответа AI или сообщение об ошибке
      */
     suspend fun chat(
         message: String,
         modelId: String,
+        parameters: ChatRequestParameters? = null,
         customSystemPrompt: String? = null
     ): String {
-        logger.i("Chat requested. Model: $modelId")
+        val providerType = inferProviderFromModel(modelId)
+        return chatWithProvider(message, providerType, modelId, parameters, customSystemPrompt)
+    }
+
+    /**
+     * Отправляет сообщение используя указанный провайдер.
+     * Рекомендуемый метод для новой архитектуры.
+     *
+     * @param message Сообщение пользователя
+     * @param providerType Тип AI-провайдера
+     * @param modelId ID модели
+     * @param parameters Параметры генерации
+     * @param customSystemPrompt Опциональный кастомный системный промт
+     * @return Текст ответа AI или сообщение об ошибке
+     */
+    suspend fun chatWithProvider(
+        message: String,
+        providerType: ProviderType,
+        modelId: String,
+        parameters: ChatRequestParameters? = null,
+        customSystemPrompt: String? = null
+    ): String {
+        logger.i("Chat requested. Provider: $providerType, Model: $modelId")
         logger.d("User message length: ${message.length}")
 
         // Формируем список сообщений с системным промтом
         val messages = buildList {
-            // Добавляем системный промт
             add(
-                ChatMessage(
-                    role = "system",
-//                    content = customSystemPrompt ?: SystemPromptConfig.getSystemPrompt()
-                    content = SystemPromptConfig.getSystemPrompt()
+                UnifiedChatMessage(
+                    role = MessageRole.SYSTEM,
+                    content = customSystemPrompt ?: SystemPromptConfig.getSystemPrompt()
                 )
             )
-            // Добавляем сообщение пользователя
             add(
-                ChatMessage(
-                    role = "user",
+                UnifiedChatMessage(
+                    role = MessageRole.USER,
                     content = message
                 )
             )
         }
 
-        val result = chatApiClient.sendChatRequest(modelId, messages)
-
-        return result.fold(
-            onSuccess = { response ->
-                val message = response.choices?.firstOrNull()?.message
-                val content = message?.content
-                val reasoningContent = message?.reasoning_content
-
-                // Используем reasoning_content если content пустой
-                val actualContent = when {
-                    !content.isNullOrBlank() -> content
-                    !reasoningContent.isNullOrBlank() -> reasoningContent
-                    else -> "No response from model"
-                }
-
-                logger.i("Response received. Length: ${actualContent.length}")
-                logger.d("Response preview: ${actualContent.take(150)}...")
-
-                actualContent
-            },
-            onFailure = { exception ->
-                val errorMsg = "Error: ${exception.message}"
-                logger.e(errorMsg, exception)
-                logger.e("Exception type: ${exception::class.simpleName}")
-
-                // Предоставляем понятные пользователю сообщения об ошибках
-                when {
-                    exception.message?.contains("timeout", ignoreCase = true) == true ->
-                        "Request timeout. The AI model is taking too long. Try the 'Fastest' model."
-                    exception.message?.contains("401", ignoreCase = true) == true ||
-                    exception.message?.contains("Unauthorized", ignoreCase = true) == true ->
-                        "API Key error. Check your configuration."
-                    exception.message?.contains("429", ignoreCase = true) == true ->
-                        "Too many requests. Please wait a moment."
-                    exception.message?.contains("connection", ignoreCase = true) == true ->
-                        "Connection error. Check your internet connection."
-                    else -> "Error: ${exception.message ?: "Unknown error"}"
-                }
-            }
-        )
+        return sendRequest(providerType, modelId, messages, parameters)
     }
 
     /**
      * Отправляет сообщение с историей разговора для контекста.
      * Системный промт добавляется автоматически.
-     * История передается с правильным чередованием ролей user/assistant.
      *
      * @param message Сообщение пользователя
      * @param modelId Модель для использования
      * @param conversationHistory Предыдущие сообщения с ролями для контекста
+     * @param parameters Параметры генерации
      * @param currentQuestionNumber Номер текущего вопроса (для режима интервью)
-     * @param fixedTotalQuestions Зафиксированное общее количество вопросов (защита от изменений)
+     * @param fixedTotalQuestions Зафиксированное общее количество вопросов
      * @param customSystemPrompt Опциональный кастомный системный промт
      * @return Текст ответа AI
      */
@@ -109,11 +110,33 @@ class ChatAgent {
         message: String,
         modelId: String,
         conversationHistory: List<InterviewHistoryEntry> = emptyList(),
+        parameters: ChatRequestParameters? = null,
         currentQuestionNumber: Int? = null,
         fixedTotalQuestions: Int? = null,
         customSystemPrompt: String? = null
     ): String {
-        logger.i("Chat with history. Model: $modelId, History size: ${conversationHistory.size}, Current question: $currentQuestionNumber, Fixed totalQuestions: $fixedTotalQuestions")
+        val providerType = inferProviderFromModel(modelId)
+        return chatWithHistory(
+            message, providerType, modelId, conversationHistory,
+            parameters, currentQuestionNumber, fixedTotalQuestions, customSystemPrompt
+        )
+    }
+
+    /**
+     * Отправляет сообщение с историей, используя указанный провайдер.
+     * Рекомендуемый метод для новой архитектуры.
+     */
+    suspend fun chatWithHistory(
+        message: String,
+        providerType: ProviderType,
+        modelId: String,
+        conversationHistory: List<InterviewHistoryEntry> = emptyList(),
+        parameters: ChatRequestParameters? = null,
+        currentQuestionNumber: Int? = null,
+        fixedTotalQuestions: Int? = null,
+        customSystemPrompt: String? = null
+    ): String {
+        logger.i("Chat with history. Provider: $providerType, Model: $modelId, History size: ${conversationHistory.size}")
 
         // Формируем системный промт с информацией о прогрессе интервью
         val systemPrompt = if (currentQuestionNumber != null && conversationHistory.isNotEmpty()) {
@@ -135,54 +158,98 @@ class ChatAgent {
 
         // Формируем список сообщений с историей
         val messages = buildList {
-            // Системный промт
             add(
-                ChatMessage(
-                    role = "system",
+                UnifiedChatMessage(
+                    role = MessageRole.SYSTEM,
                     content = systemPrompt
                 )
             )
 
             // История разговора с правильными ролями
             conversationHistory.forEach { entry ->
-                add(entry.toChatMessage())
+                add(entry.toUnifiedChatMessage())
             }
 
-            // Текущее сообщение пользователя
             add(
-                ChatMessage(
-                    role = "user",
+                UnifiedChatMessage(
+                    role = MessageRole.USER,
                     content = message
                 )
             )
         }
 
         logger.d("Total messages: ${messages.size}")
-        logger.d("Messages breakdown: system=1, history=${conversationHistory.size}, user=1")
 
-        val result = chatApiClient.sendChatRequest(modelId, messages)
+        return sendRequest(providerType, modelId, messages, parameters)
+    }
 
-        return result.fold(
-            onSuccess = { response ->
-                val message = response.choices?.firstOrNull()?.message
-                val content = message?.content
-                val reasoningContent = message?.reasoning_content
+    /**
+     * Отправляет запрос через AIProvider.
+     */
+    private suspend fun sendRequest(
+        providerType: ProviderType,
+        modelId: String,
+        messages: List<UnifiedChatMessage>,
+        parameters: ChatRequestParameters?
+    ): String {
+        return try {
+            // Логируем параметры запроса для отладки
+            logger.d("Request parameters: temperature=${parameters?.temperature}, " +
+                     "doSample=${parameters?.doSample}, maxTokens=${parameters?.maxTokens}, " +
+                     "topP=${parameters?.topP}, thinking=${parameters?.thinking?.type}")
 
-                // Используем reasoning_content если content пустой
-                val actualContent = when {
-                    !content.isNullOrBlank() -> content
-                    !reasoningContent.isNullOrBlank() -> reasoningContent
-                    else -> "No response from model"
+            val provider = AIProviderFactory.createProvider(providerType)
+
+            val request = UnifiedChatRequest(
+                providerType = providerType,
+                modelId = modelId,
+                messages = messages,
+                parameters = parameters,
+                stream = false
+            )
+
+            val result = provider.sendChatRequest(request)
+
+            result.fold(
+                onSuccess = { response ->
+                    val actualContent = when {
+                        !response.content.isNullOrBlank() -> response.content
+                        !response.thinkingContent.isNullOrBlank() -> response.thinkingContent
+                        else -> "No response from model"
+                    }
+
+                    logger.i("Response received. Length: ${actualContent.length}")
+                    actualContent
+                },
+                onFailure = { exception ->
+                    val errorMsg = formatErrorMessage(exception)
+                    logger.e(errorMsg, exception)
+                    errorMsg
                 }
+            )
+        } catch (e: Exception) {
+            val errorMsg = formatErrorMessage(e)
+            logger.e("Request failed for provider: $providerType, model: $modelId", e)
+            errorMsg
+        }
+    }
 
-                logger.i("Response received. Length: ${actualContent.length}")
-                actualContent
-            },
-            onFailure = { exception ->
-                logger.e("Chat with history failed", exception)
-                "Error: ${exception.message ?: "Unknown error"}"
-            }
-        )
+    /**
+     * Форматирует исключение в понятное пользователю сообщение.
+     */
+    private fun formatErrorMessage(exception: Throwable): String {
+        return when {
+            exception.message?.contains("timeout", ignoreCase = true) == true ->
+                "Request timeout. The AI model is taking too long. Try a faster model."
+            exception.message?.contains("401", ignoreCase = true) == true ||
+            exception.message?.contains("Unauthorized", ignoreCase = true) == true ->
+                "API Key error. Check your configuration."
+            exception.message?.contains("429", ignoreCase = true) == true ->
+                "Too many requests. Please wait a moment."
+            exception.message?.contains("connection", ignoreCase = true) == true ->
+                "Connection error. Check your internet connection."
+            else -> "Error: ${exception.message ?: "Unknown error"}"
+        }
     }
 }
 

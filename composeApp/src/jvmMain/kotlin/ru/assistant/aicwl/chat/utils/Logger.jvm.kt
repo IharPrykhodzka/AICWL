@@ -1,26 +1,32 @@
 package ru.assistant.aicwl.chat.utils
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 actual fun createLogger(tag: String): PlatformLogger {
     return object : PlatformLogger {
-        override fun d(message: String) {
-            println("[DEBUG] $tag: $message")
-        }
+        override val tag: String = tag
 
-        override fun i(message: String) {
-            println("[INFO] $tag: $message")
-        }
+        override fun log(level: LogLevel, message: String) {
+            val timestamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()).format(Date())
 
-        override fun w(message: String) {
-            println("[WARN] $tag: $message")
-        }
+            val (levelStr, colorCode) = when (level) {
+                LogLevel.VERBOSE -> "[VERBOSE]" to "\u001B[37m"      // White
+                LogLevel.DEBUG -> "[DEBUG]" to "\u001B[36m"         // Cyan
+                LogLevel.INFO -> "[INFO]" to "\u001B[32m"           // Green
+                LogLevel.WARNING -> "[WARN]" to "\u001B[33m"        // Yellow
+                LogLevel.ERROR, LogLevel.NONE -> "[ERROR]" to "\u001B[31m"  // Red
+            }
+            val resetColor = "\u001B[0m"
 
-        override fun e(message: String) {
-            System.err.println("[ERROR] $tag: $message")
-        }
+            val output = "$resetColor[$timestamp]$colorCode $levelStr$resetColor $tag: $message"
 
-        override fun e(message: String, throwable: Throwable) {
-            System.err.println("[ERROR] $tag: $message")
-            throwable.printStackTrace()
+            if (level == LogLevel.ERROR || level == LogLevel.NONE) {
+                System.err.println(output)
+            } else {
+                println(output)
+            }
         }
     }
 }

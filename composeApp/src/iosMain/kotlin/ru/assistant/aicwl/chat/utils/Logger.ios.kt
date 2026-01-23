@@ -4,24 +4,17 @@ import platform.Foundation.NSLog
 
 actual fun createLogger(tag: String): PlatformLogger {
     return object : PlatformLogger {
-        override fun d(message: String) {
-            NSLog("[DEBUG] [$tag] $message")
-        }
+        override val tag: String = tag
 
-        override fun i(message: String) {
-            NSLog("[INFO] [$tag] $message")
-        }
-
-        override fun w(message: String) {
-            NSLog("[WARN] [$tag] $message")
-        }
-
-        override fun e(message: String) {
-            NSLog("[ERROR] [$tag] $message")
-        }
-
-        override fun e(message: String, throwable: Throwable) {
-            NSLog("[ERROR] [$tag] $message: ${throwable.message}")
+        override fun log(level: LogLevel, message: String) {
+            val prefix = when (level) {
+                LogLevel.VERBOSE -> "VERBOSE"
+                LogLevel.DEBUG -> "DEBUG"
+                LogLevel.INFO -> "INFO"
+                LogLevel.WARNING -> "WARN"
+                LogLevel.ERROR, LogLevel.NONE -> "ERROR"
+            }
+            NSLog("[$prefix] [$tag] $message")
         }
     }
 }

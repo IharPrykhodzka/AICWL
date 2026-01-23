@@ -13,6 +13,7 @@ import ru.assistant.aicwl.chat.config.AppConfig
 import ru.assistant.aicwl.chat.data.ChatCompletionRequest
 import ru.assistant.aicwl.chat.data.ChatCompletionResponse
 import ru.assistant.aicwl.chat.data.ChatMessage
+import ru.assistant.aicwl.chat.data.ChatRequestParameters
 import ru.assistant.aicwl.chat.data.ChatApiErrorResponse
 import ru.assistant.aicwl.chat.utils.createLogger
 
@@ -53,23 +54,46 @@ class ChatApiClient {
      *
      * @param modelId Идентификатор модели (например, "glm-4.7", "glm-4.6", "glm-4.5-air")
      * @param messages Список сообщений чата в разговоре
+     * @param parameters Параметры генерации (temperature, maxTokens, и т.д.)
      * @return Result содержащий ChatCompletionResponse или ошибку
      */
     suspend fun sendChatRequest(
         modelId: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        parameters: ChatRequestParameters? = null
     ): Result<ChatCompletionResponse> {
         logger.i("Отправка запроса модели: $modelId, количество сообщений: ${messages.size}")
         logger.d("Endpoint: ${AppConfig.zApiEndpoint}")
 
-        val request = ChatCompletionRequest(
+        val request = ChatCompletionRequest.fromParameters(
             model = modelId,
-            messages = messages
+            messages = messages,
+            parameters = parameters
         )
 
-        // Отладка: логируем JSON запроса
+        // Логируем параметры отдельно для наглядности
+        logger.i("=== Request Parameters ===")
+        logger.i("  model: $modelId")
+        if (parameters != null) {
+            logger.i("  do_sample: ${parameters.doSample}")
+            logger.i("  temperature: ${parameters.temperature ?: "null (default)"}")
+            logger.i("  top_p: ${parameters.topP ?: "null (default)"}")
+            logger.i("  max_tokens: ${parameters.maxTokens ?: "null (default)"}")
+            logger.i("  stream: ${parameters.stream}")
+            logger.i("  thinking: ${parameters.thinking.type}")
+            logger.i("  n: ${parameters.n}")
+        } else {
+            logger.i("  parameters: null (using API defaults)")
+        }
+        // Последнее сообщение для контекста
+        messages.lastOrNull()?.let {
+            logger.i("  last_message: ${it.role} -> ${it.content.take(100)}${if (it.content.length > 100) "..." else ""}")
+        }
+        logger.i("========================")
+
+        // Отладка: логируем полный JSON запроса
         val requestString = json.encodeToString(ChatCompletionRequest.serializer(), request)
-        logger.d("Request JSON: $requestString")
+        logger.d("Full Request JSON:\n$requestString")
 
         return try {
             val response: HttpResponse = client.post(AppConfig.zApiEndpoint) {

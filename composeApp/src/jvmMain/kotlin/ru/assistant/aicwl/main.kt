@@ -7,8 +7,11 @@ import ru.assistant.aicwl.chat.prompt.data.PromptPreferences
 import ru.assistant.aicwl.chat.data.ChatHistoryPreferences
 import ru.assistant.aicwl.chat.ui.initializeChatViewModel
 import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
+import ru.assistant.aicwl.chat.utils.LoggingConfig
 
 fun main() = application {
+    // Включаем debug логирование для Desktop
+    LoggingConfig.enableDebug()
     // Initialize preferences
     val preferences = PromptPreferences()
     val chatHistoryPrefs = ChatHistoryPreferences()

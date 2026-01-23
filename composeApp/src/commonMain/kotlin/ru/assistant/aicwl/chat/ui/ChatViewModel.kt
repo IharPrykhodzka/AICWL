@@ -8,12 +8,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.assistant.aicwl.chat.agent.chatAgent
 import ru.assistant.aicwl.chat.config.ModelConfig
+import ru.assistant.aicwl.chat.config.TemperatureProfile
 import ru.assistant.aicwl.chat.prompt.PromptRules
 import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
 import ru.assistant.aicwl.chat.data.EnhancedChatMessage
 import ru.assistant.aicwl.chat.data.InterviewHistoryEntry
 import ru.assistant.aicwl.chat.data.MessageRole
 import ru.assistant.aicwl.chat.data.UiChatMessage
+import ru.assistant.aicwl.chat.provider.ProviderType
+import ru.assistant.aicwl.chat.provider.model.AIModelConfig
+import ru.assistant.aicwl.chat.provider.model.UnifiedAIModel
 import ru.assistant.aicwl.chat.utils.currentTimeMillis
 import ru.assistant.aicwl.chat.utils.createLogger
 
@@ -36,9 +40,47 @@ class ChatViewModel(
     /**
      * Обновляет выбранную AI-модель.
      */
+    fun selectModel(model: UnifiedAIModel) {
+        logger.i("Model selected: ${model.modelId} (${model.displayName}) - Provider: ${model.providerType}")
+        _uiState.value = _uiState.value.copy(
+            selectedModel = model,
+            selectedProvider = model.providerType
+        )
+    }
+
+    /**
+     * Обновляет выбранную AI-модель по ID (для обратной совместимости).
+     */
     fun selectModel(modelId: String) {
-        logger.i("Model selected: $modelId (display: ${ModelConfig.getDisplayName(modelId)})")
-        _uiState.value = _uiState.value.copy(selectedModel = modelId)
+        // Пытаемся найти модель в списке всех моделей
+        val model = AIModelConfig.getAllModels().find { it.modelId == modelId }
+        if (model != null) {
+            selectModel(model)
+        } else {
+            logger.w("Model not found in AIModelConfig: $modelId, using fallback")
+            // Fallback - создаем временную модель на основе ModelConfig
+            _uiState.value = _uiState.value.copy(selectedModel = AIModelConfig.defaultModel)
+        }
+    }
+
+    /**
+     * Обновляет выбранный провайдер.
+     */
+    fun selectProvider(provider: ProviderType) {
+        logger.i("Provider selected: $provider")
+        val defaultModel = AIModelConfig.getDefaultModelForProvider(provider)
+        _uiState.value = _uiState.value.copy(
+            selectedProvider = provider,
+            selectedModel = defaultModel
+        )
+    }
+
+    /**
+     * Обновляет выбранный профиль температуры.
+     */
+    fun selectProfile(profile: TemperatureProfile) {
+        logger.i("Profile selected: ${profile.displayName} (${profile.description})")
+        _uiState.value = _uiState.value.copy(selectedProfile = profile)
     }
 
     /**
@@ -100,8 +142,9 @@ class ChatViewModel(
 
                     chatAgent.chatWithHistory(
                         message = currentInput,
-                        modelId = _uiState.value.selectedModel,
+                        modelId = _uiState.value.selectedModel.modelId,
                         conversationHistory = _uiState.value.businessAnalystHistory,
+                        parameters = _uiState.value.selectedProfile.parameters,
                         currentQuestionNumber = currentQuestionNumber,
                         fixedTotalQuestions = _uiState.value.fixedTotalQuestions
                     )
@@ -121,8 +164,9 @@ class ChatViewModel(
 
                     chatAgent.chatWithHistory(
                         message = currentInput,
-                        modelId = _uiState.value.selectedModel,
-                        conversationHistory = conversationHistory
+                        modelId = _uiState.value.selectedModel.modelId,
+                        conversationHistory = conversationHistory,
+                        parameters = _uiState.value.selectedProfile.parameters
                     )
                 }
 
@@ -347,7 +391,9 @@ class ChatViewModel(
         // Список расширенных сообщений с поддержкой структурированных ответов
         val enhancedMessages: List<EnhancedChatMessage> = emptyList(),
         val inputText: String = "",
-        val selectedModel: String = ModelConfig.DEFAULT_MODEL,
+        val selectedModel: UnifiedAIModel = AIModelConfig.defaultModel,
+        val selectedProvider: ProviderType = ProviderType.DEFAULT,
+        val selectedProfile: TemperatureProfile = TemperatureProfile.DEFAULT,
         val isLoading: Boolean = false,
         val isModelSelectorExpanded: Boolean = false,
         // Режим бизнес-аналитика - AI задает вопросы для сбора требований
@@ -361,5 +407,9 @@ class ChatViewModel(
         // Обратная совместимость - простой список для старого UI
         val messages: List<UiChatMessage>
             get() = enhancedMessages.map { it.toUiChatMessage() }
+
+        // Обратная совместимость - строковый ID модели
+        val modelId: String
+            get() = selectedModel.modelId
     }
 }

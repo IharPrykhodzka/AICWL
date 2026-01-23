@@ -4,24 +4,16 @@ import android.util.Log
 
 actual fun createLogger(tag: String): PlatformLogger {
     return object : PlatformLogger {
-        override fun d(message: String) {
-            Log.d(tag, message)
-        }
+        override val tag: String = tag
 
-        override fun i(message: String) {
-            Log.i(tag, message)
-        }
-
-        override fun w(message: String) {
-            Log.w(tag, message)
-        }
-
-        override fun e(message: String) {
-            Log.e(tag, message)
-        }
-
-        override fun e(message: String, throwable: Throwable) {
-            Log.e(tag, message, throwable)
+        override fun log(level: LogLevel, message: String) {
+            when (level) {
+                LogLevel.VERBOSE -> Log.v(tag, message)
+                LogLevel.DEBUG -> Log.d(tag, message)
+                LogLevel.INFO -> Log.i(tag, message)
+                LogLevel.WARNING -> Log.w(tag, message)
+                LogLevel.ERROR, LogLevel.NONE -> Log.e(tag, message)
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Workspaces
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.assistant.aicwl.chat.config.ModelConfig
+import ru.assistant.aicwl.chat.config.TemperatureProfile
 import ru.assistant.aicwl.chat.data.EnhancedChatMessage
 import ru.assistant.aicwl.chat.utils.getClipboardManager
 import ru.assistant.aicwl.chat.data.MessageRole
@@ -110,8 +112,10 @@ fun ChatScreen(
         Scaffold(
             topBar = {
                 ChatTopBar(
-                    selectedModel = uiState.selectedModel,
+                    selectedModel = uiState.selectedModel.modelId,
                     onModelSelected = { viewModel.selectModel(it) },
+                    selectedProfile = uiState.selectedProfile,
+                    onProfileSelected = { viewModel.selectProfile(it) },
                     onClearChat = { viewModel.clearChat() },
                     onSettingsClick = { showSettingsScreen = true }
                 )
@@ -163,17 +167,20 @@ fun ChatScreen(
 }
 
 /**
- * Верхняя панель с выбором модели и кнопкой очистки.
+ * Верхняя панель с выбором модели, профиля температуры и кнопкой очистки.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatTopBar(
     selectedModel: String,
     onModelSelected: (String) -> Unit,
+    selectedProfile: TemperatureProfile,
+    onProfileSelected: (TemperatureProfile) -> Unit,
     onClearChat: () -> Unit,
     onSettingsClick: () -> Unit = {}
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var modelExpanded by remember { mutableStateOf(false) }
+    var profileExpanded by remember { mutableStateOf(false) }
 
     TopAppBar(
         title = {
@@ -183,17 +190,67 @@ fun ChatTopBar(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = ModelConfig.getDisplayName(selectedModel),
+                    text = "${ModelConfig.getDisplayName(selectedModel)} • ${selectedProfile.displayName}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         actions = {
+            // Селектор профиля температуры
+            Box(modifier = Modifier.padding(end = 4.dp)) {
+                IconButton(
+                    onClick = { profileExpanded = true },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Thermostat,
+                        contentDescription = "Select temperature profile",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = profileExpanded,
+                    onDismissRequest = { profileExpanded = false }
+                ) {
+                    TemperatureProfile.entries.forEach { profile ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = profile.displayName,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = profile.description,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (profile == selectedProfile) {
+                                        Text(
+                                            text = "Selected",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                onProfileSelected(profile)
+                                profileExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             // Селектор модели
-            Box(modifier = Modifier.padding(end = 8.dp)) {
+            Box(modifier = Modifier.padding(end = 4.dp)) {
                 TextButton(
-                    onClick = { expanded = true },
+                    onClick = { modelExpanded = true },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.primary
                     )
@@ -207,8 +264,8 @@ fun ChatTopBar(
                 }
 
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded = modelExpanded,
+                    onDismissRequest = { modelExpanded = false }
                 ) {
                     ModelConfig.ALL_MODELS.forEach { modelId ->
                         DropdownMenuItem(
@@ -229,7 +286,7 @@ fun ChatTopBar(
                             },
                             onClick = {
                                 onModelSelected(modelId)
-                                expanded = false
+                                modelExpanded = false
                             }
                         )
                     }

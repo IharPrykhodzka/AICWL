@@ -80,15 +80,19 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Read API key from local.properties
+        // Read API keys from local.properties
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
             localProperties.load(localPropertiesFile.inputStream())
         }
         val llmApiKey = localProperties.getProperty("llm.z.api.key") ?: ""
+        val openaiApiKey = localProperties.getProperty("llm.openai.api.key") ?: ""
+        val anthropicApiKey = localProperties.getProperty("llm.anthropic.api.key") ?: ""
 
         buildConfigField("String", "LLM_API_KEY", "\"$llmApiKey\"")
+        buildConfigField("String", "OPENAI_API_KEY", "\"$openaiApiKey\"")
+        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$anthropicApiKey\"")
     }
     buildFeatures {
         buildConfig = true

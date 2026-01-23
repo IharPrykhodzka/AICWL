@@ -1,15 +1,31 @@
 package ru.assistant.aicwl.chat.config
 
 actual object AppConfig {
+    // Z.ai Configuration
     actual val zApiKey: String by lazy {
-        loadConfigProperty("llm.z.api.key") ?: error(
-            "API Key not found! Please set llm.z.api.key in config.properties. " +
-            "Create config.properties in the project root with your API key."
-        )
+        loadConfigProperty("llm.z.api.key") ?: ""
     }
 
     actual val zApiEndpoint: String by lazy {
         loadConfigProperty("llm.z.api.endpoint") ?: "https://api.z.ai/api/coding/paas/v4/chat/completions"
+    }
+
+    // OpenAI Configuration
+    actual val openaiApiKey: String by lazy {
+        loadConfigProperty("llm.openai.api.key") ?: ""
+    }
+
+    actual val openaiApiEndpoint: String by lazy {
+        loadConfigProperty("llm.openai.api.endpoint") ?: "https://api.openai.com/v1/chat/completions"
+    }
+
+    // Anthropic Configuration
+    actual val anthropicApiKey: String by lazy {
+        loadConfigProperty("llm.anthropic.api.key") ?: ""
+    }
+
+    actual val anthropicApiEndpoint: String by lazy {
+        loadConfigProperty("llm.anthropic.api.endpoint") ?: "https://api.anthropic.com/v1/messages"
     }
 
     private fun loadConfigProperty(key: String): String? {
