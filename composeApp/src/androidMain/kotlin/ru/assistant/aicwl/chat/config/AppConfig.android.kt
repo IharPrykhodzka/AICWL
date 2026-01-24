@@ -7,11 +7,11 @@ actual object AppConfig {
     actual val zApiKey: String = BuildConfig.LLM_API_KEY
     actual val zApiEndpoint: String = "https://api.z.ai/api/coding/paas/v4/chat/completions"
 
-    // OpenAI Configuration
-    actual val openaiApiKey: String = BuildConfig.OPENAI_API_KEY
-    actual val openaiApiEndpoint: String = "https://api.openai.com/v1/chat/completions"
+    // Qwen Configuration
+    actual val qwenApiKey: String = ""
+    actual val qwenApiEndpoint: String = "https://router.huggingface.co/v1/chat/completions"
 
-    // Anthropic Configuration
-    actual val anthropicApiKey: String = BuildConfig.ANTHROPIC_API_KEY
-    actual val anthropicApiEndpoint: String = "https://api.anthropic.com/v1/messages"
+    // Oreal Configuration
+    actual val orealApiKey: String = ""
+    actual val orealApiEndpoint: String = "https://router.huggingface.co/v1/chat/completions"
 }

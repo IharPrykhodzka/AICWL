@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.assistant.aicwl.chat.config.ModelConfig
 import ru.assistant.aicwl.chat.config.TemperatureProfile
+import ru.assistant.aicwl.chat.provider.model.UnifiedAIModel
+import ru.assistant.aicwl.chat.provider.model.AIModelConfig
 import ru.assistant.aicwl.chat.data.EnhancedChatMessage
 import ru.assistant.aicwl.chat.utils.getClipboardManager
 import ru.assistant.aicwl.chat.data.MessageRole
@@ -112,7 +114,7 @@ fun ChatScreen(
         Scaffold(
             topBar = {
                 ChatTopBar(
-                    selectedModel = uiState.selectedModel.modelId,
+                    selectedModel = uiState.selectedModel,
                     onModelSelected = { viewModel.selectModel(it) },
                     selectedProfile = uiState.selectedProfile,
                     onProfileSelected = { viewModel.selectProfile(it) },
@@ -172,8 +174,8 @@ fun ChatScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatTopBar(
-    selectedModel: String,
-    onModelSelected: (String) -> Unit,
+    selectedModel: UnifiedAIModel,
+    onModelSelected: (UnifiedAIModel) -> Unit,
     selectedProfile: TemperatureProfile,
     onProfileSelected: (TemperatureProfile) -> Unit,
     onClearChat: () -> Unit,
@@ -181,6 +183,9 @@ fun ChatTopBar(
 ) {
     var modelExpanded by remember { mutableStateOf(false) }
     var profileExpanded by remember { mutableStateOf(false) }
+
+    // Determine if temperature control should be disabled (for Qwen models)
+    val isTemperatureDisabled = !selectedModel.supportsThinking
 
     TopAppBar(
         title = {
@@ -190,7 +195,7 @@ fun ChatTopBar(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = "${ModelConfig.getDisplayName(selectedModel)} • ${selectedProfile.displayName}",
+                    text = "${selectedModel.displayName} • ${selectedProfile.displayName}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -200,14 +205,21 @@ fun ChatTopBar(
             // Селектор профиля температуры
             Box(modifier = Modifier.padding(end = 4.dp)) {
                 IconButton(
-                    onClick = { profileExpanded = true },
+                    onClick = { if (!isTemperatureDisabled) profileExpanded = true },
                     colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
+                        contentColor = if (isTemperatureDisabled)
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        else
+                            MaterialTheme.colorScheme.primary
+                    ),
+                    enabled = !isTemperatureDisabled
                 ) {
                     Icon(
                         imageVector = Icons.Default.Thermostat,
-                        contentDescription = "Select temperature profile",
+                        contentDescription = if (isTemperatureDisabled)
+                            "Temperature not available for this model"
+                        else
+                            "Select temperature profile",
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -267,15 +279,20 @@ fun ChatTopBar(
                     expanded = modelExpanded,
                     onDismissRequest = { modelExpanded = false }
                 ) {
-                    ModelConfig.ALL_MODELS.forEach { modelId ->
+                    AIModelConfig.getAllModels().forEach { model ->
                         DropdownMenuItem(
                             text = {
                                 Column {
                                     Text(
-                                        text = ModelConfig.getDisplayName(modelId),
+                                        text = model.displayName,
                                         style = MaterialTheme.typography.bodySmall
                                     )
-                                    if (modelId == selectedModel) {
+                                    Text(
+                                        text = model.description,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (model.uniqueId == selectedModel.uniqueId) {
                                         Text(
                                             text = "Selected",
                                             style = MaterialTheme.typography.labelSmall,
@@ -285,7 +302,7 @@ fun ChatTopBar(
                                 }
                             },
                             onClick = {
-                                onModelSelected(modelId)
+                                onModelSelected(model)
                                 modelExpanded = false
                             }
                         )

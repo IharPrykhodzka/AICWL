@@ -9,8 +9,6 @@ import kotlinx.cinterop.ExperimentalForeignApi
  *
  * Формат local_config.txt:
  * ZAI_API_KEY=your_zai_key_here
- * OPENAI_API_KEY=your_openai_key_here
- * ANTHROPIC_API_KEY=your_anthropic_key_here
  */
 object LocalConfigLoader {
     @OptIn(ExperimentalForeignApi::class)
@@ -31,16 +29,6 @@ object LocalConfigLoader {
     @OptIn(ExperimentalForeignApi::class)
     fun loadApiKeyFromFile(): String? {
         return loadConfigFile()?.get("ZAI_API_KEY")
-    }
-
-    @OptIn(ExperimentalForeignApi::class)
-    fun loadOpenAiApiKey(): String? {
-        return loadConfigFile()?.get("OPENAI_API_KEY")
-    }
-
-    @OptIn(ExperimentalForeignApi::class)
-    fun loadAnthropicApiKey(): String? {
-        return loadConfigFile()?.get("ANTHROPIC_API_KEY")
     }
 }
 

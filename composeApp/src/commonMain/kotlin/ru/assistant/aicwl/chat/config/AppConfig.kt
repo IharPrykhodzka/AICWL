@@ -5,21 +5,20 @@ package ru.assistant.aicwl.chat.config
  *
  * ВАЖНО: Создайте config.properties в корне проекта с:
  * llm.z.api.key=YOUR_API_KEY_HERE
- * llm.openai.api.key=YOUR_OPENAI_API_KEY_HERE
- * llm.anthropic.api.key=YOUR_ANTHROPIC_API_KEY_HERE
+ * llm.qwen.api.key=YOUR_API_KEY_HERE
  */
 expect object AppConfig {
     // Z.ai Configuration
     val zApiKey: String
     val zApiEndpoint: String
 
-    // OpenAI Configuration
-    val openaiApiKey: String
-    val openaiApiEndpoint: String
+    // Qwen Configuration
+    val qwenApiKey: String
+    val qwenApiEndpoint: String
 
-    // Anthropic Configuration
-    val anthropicApiKey: String
-    val anthropicApiEndpoint: String
+    // Oreal Configuration
+    val orealApiKey: String
+    val orealApiEndpoint: String
 }
 
 /**
@@ -39,15 +38,11 @@ object ApiKeyValidator {
         // Проверка на placeholder-значения
         val normalizedKey = key.trim()
         if (normalizedKey.equals("YOUR_API_KEY_HERE", ignoreCase = true) ||
-            normalizedKey.equals("YOUR_OPENAI_API_KEY_HERE", ignoreCase = true) ||
-            normalizedKey.equals("YOUR_ANTHROPIC_API_KEY_HERE", ignoreCase = true) ||
             normalizedKey.startsWith("your-", ignoreCase = true)) {
             return false
         }
 
-        // OpenAI ключи обычно начинаются с "sk-"
-        // Anthropic ключи обычно начинаются с "sk-ant-"
-        // Z.ai ключи могут быть в другом формате
+        // Z.ai ключи могут быть в любом формате
 
         // Проверяем минимальную длину (все API ключи должны быть достаточно длинными)
         return key.length >= 20
@@ -61,8 +56,8 @@ object ApiKeyValidator {
     fun validateAllKeys(): Map<String, Boolean> {
         return mapOf(
             "ZAI" to isValidApiKey(AppConfig.zApiKey),
-            "OPENAI" to isValidApiKey(AppConfig.openaiApiKey),
-            "ANTHROPIC" to isValidApiKey(AppConfig.anthropicApiKey)
+            "QWEN" to isValidApiKey(AppConfig.qwenApiKey),
+            "OREAL" to isValidApiKey(AppConfig.orealApiKey)
         )
     }
 
@@ -92,11 +87,11 @@ object ApiKeyValidator {
             append("  Z.ai: ${if (validation["ZAI"] == true) "✓" else "✗"} ")
             append(if (AppConfig.zApiKey.isNotBlank()) maskApiKey(AppConfig.zApiKey) else "Not set")
             appendLine()
-            append("  OpenAI: ${if (validation["OPENAI"] == true) "✓" else "✗"} ")
-            append(if (AppConfig.openaiApiKey.isNotBlank()) maskApiKey(AppConfig.openaiApiKey) else "Not set")
+            append("  Qwen: ${if (validation["QWEN"] == true) "✓" else "✗"} ")
+            append(if (AppConfig.qwenApiKey.isNotBlank()) maskApiKey(AppConfig.qwenApiKey) else "Not set")
             appendLine()
-            append("  Anthropic: ${if (validation["ANTHROPIC"] == true) "✓" else "✗"} ")
-            append(if (AppConfig.anthropicApiKey.isNotBlank()) maskApiKey(AppConfig.anthropicApiKey) else "Not set")
+            append("  Oreal: ${if (validation["OREAL"] == true) "✓" else "✗"} ")
+            append(if (AppConfig.orealApiKey.isNotBlank()) maskApiKey(AppConfig.orealApiKey) else "Not set")
         }
     }
 }

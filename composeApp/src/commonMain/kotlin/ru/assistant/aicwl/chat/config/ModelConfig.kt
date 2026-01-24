@@ -149,6 +149,13 @@ object ModelConfig {
      */
     const val GLM_MODEL_JUNIOR = "glm-4.5-air"
 
+    // ============== QWEN MODELS ==============
+    /**
+     * Qwen модель - легковесная модель через HuggingFace.
+     * Не поддерживает регулировку температуры (фиксированная температура).
+     */
+    const val QWEN_MODEL_JUNIOR = "gangchen/Qwen2.5-0.5B-Instruct-Gensyn-Swarm-zealous_scurrying_cat:featherless-ai"
+
     /**
      * Модель по умолчанию, если пользователь не сделал выбор.
      */
@@ -160,7 +167,8 @@ object ModelConfig {
     val ALL_MODELS = listOf(
         GLM_MODEL_SENIOR,
         GLM_MODEL_MIDDLE,
-        GLM_MODEL_JUNIOR
+        GLM_MODEL_JUNIOR,
+        QWEN_MODEL_JUNIOR
     )
 
     /**
@@ -169,7 +177,8 @@ object ModelConfig {
     val MODEL_DISPLAY_NAMES = mapOf(
         GLM_MODEL_SENIOR to "Senior (GLM-4.7) - Most Powerful",
         GLM_MODEL_MIDDLE to "Middle (GLM-4.7-Flash) - Balanced",
-        GLM_MODEL_JUNIOR to "Junior (GLM-4.5-Air) - Fastest"
+        GLM_MODEL_JUNIOR to "Junior (GLM-4.5-Air) - Fastest",
+        QWEN_MODEL_JUNIOR to "Qwen2.5-0.5B (HuggingFace) - No Temp Control"
     )
 
     /**
@@ -190,6 +199,10 @@ object ModelConfig {
         GLM_MODEL_JUNIOR to ChatRequestParameters.fast().copy(
             maxTokens = 1024,
             temperature = 0.2f
+        ),
+        QWEN_MODEL_JUNIOR to ChatRequestParameters.fast().copy(
+            maxTokens = 1024,
+            temperature = 0.7f // Qwen uses fixed temperature via API
         )
     )
 
@@ -223,6 +236,16 @@ object ModelConfig {
     }
 
     /**
+     * Проверяет, поддерживает ли модель регулировку температуры.
+     *
+     * @param modelId Идентификатор модели
+     * @return true, если модель поддерживает регулировку температуры
+     */
+    fun supportsTemperature(modelId: String): Boolean {
+        return !modelId.startsWith("Qwen/") && !modelId.contains("Qwen", ignoreCase = true)
+    }
+
+    /**
      * Возвращает максимальное количество токенов для указанной модели.
      *
      * @param modelId Идентификатор модели
@@ -233,6 +256,7 @@ object ModelConfig {
             GLM_MODEL_SENIOR -> 131072
             GLM_MODEL_MIDDLE -> 131072
             GLM_MODEL_JUNIOR -> 98304
+            QWEN_MODEL_JUNIOR -> 32768
             else -> null
         }
     }

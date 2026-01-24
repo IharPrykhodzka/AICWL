@@ -18,29 +18,29 @@ actual object AppConfig {
             ?: "https://api.z.ai/api/coding/paas/v4/chat/completions"
     }
 
-    // ============== OPENAI CONFIGURATION ==============
-    actual val openaiApiKey: String by lazy {
-        LocalConfigLoader.loadOpenAiApiKey()
-            ?: NSUserDefaults.standardUserDefaults.stringForKey("OPENAI_API_KEY")
-            ?: NSBundle.mainBundle.objectForInfoDictionaryKey("OPENAI_API_KEY") as? String
+    // ============== QWEN CONFIGURATION ==============
+    actual val qwenApiKey: String by lazy {
+        NSUserDefaults.standardUserDefaults.stringForKey("LLM_QWEN_API_KEY")
+            ?: NSBundle.mainBundle.objectForInfoDictionaryKey("LLM_QWEN_API_KEY") as? String
+            ?: NSBundle.mainBundle.objectForInfoDictionaryKey("QWENApiKey") as? String
             ?: ""
     }
 
-    actual val openaiApiEndpoint: String by lazy {
-        NSBundle.mainBundle.objectForInfoDictionaryKey("OPENAI_API_ENDPOINT") as? String
-            ?: "https://api.openai.com/v1/chat/completions"
+    actual val qwenApiEndpoint: String by lazy {
+        NSBundle.mainBundle.objectForInfoDictionaryKey("LLM_QWEN_API_ENDPOINT") as? String
+            ?: "https://router.huggingface.co/v1/chat/completions"
     }
 
-    // ============== ANTHROPIC CONFIGURATION ==============
-    actual val anthropicApiKey: String by lazy {
-        LocalConfigLoader.loadAnthropicApiKey()
-            ?: NSUserDefaults.standardUserDefaults.stringForKey("ANTHROPIC_API_KEY")
-            ?: NSBundle.mainBundle.objectForInfoDictionaryKey("ANTHROPIC_API_KEY") as? String
+    // ============== OREAL CONFIGURATION ==============
+    actual val orealApiKey: String by lazy {
+        NSUserDefaults.standardUserDefaults.stringForKey("LLM_OREAL_API_KEY")
+            ?: NSBundle.mainBundle.objectForInfoDictionaryKey("LLM_OREAL_API_KEY") as? String
+            ?: NSBundle.mainBundle.objectForInfoDictionaryKey("OREALApiKey") as? String
             ?: ""
     }
 
-    actual val anthropicApiEndpoint: String by lazy {
-        NSBundle.mainBundle.objectForInfoDictionaryKey("ANTHROPIC_API_ENDPOINT") as? String
-            ?: "https://api.anthropic.com/v1/messages"
+    actual val orealApiEndpoint: String by lazy {
+        NSBundle.mainBundle.objectForInfoDictionaryKey("LLM_OREAL_API_ENDPOINT") as? String
+            ?: "https://router.huggingface.co/v1/chat/completions"
     }
 }

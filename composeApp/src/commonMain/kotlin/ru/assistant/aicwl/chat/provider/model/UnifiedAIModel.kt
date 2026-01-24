@@ -6,7 +6,7 @@ import ru.assistant.aicwl.chat.provider.ProviderType
  * Unified representation of an AI model across all providers.
  * Provides a consistent interface for model selection regardless of provider.
  *
- * @property providerType The AI provider (Z.ai, OpenAI, Anthropic)
+ * @property providerType The AI provider (Z.ai)
  * @property modelId Provider-specific model identifier
  * @property displayName Human-readable name for UI
  * @property description Brief description of model capabilities
@@ -36,8 +36,8 @@ data class UnifiedAIModel(
     val supportsThinking: Boolean
         get() = when (providerType) {
             ProviderType.ZAI -> modelId.startsWith("glm-4")
-            ProviderType.OPENAI -> modelId.startsWith("gpt-4")
-            ProviderType.ANTHROPIC -> modelId.contains("sonnet") || modelId.contains("opus")
+            ProviderType.QWEN -> false // Qwen doesn't support thinking in HuggingFace format
+            ProviderType.OREAL -> false // Oreal doesn't support thinking
         }
 
     /**

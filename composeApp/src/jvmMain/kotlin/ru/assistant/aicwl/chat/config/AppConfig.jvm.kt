@@ -10,22 +10,22 @@ actual object AppConfig {
         loadConfigProperty("llm.z.api.endpoint") ?: "https://api.z.ai/api/coding/paas/v4/chat/completions"
     }
 
-    // OpenAI Configuration
-    actual val openaiApiKey: String by lazy {
-        loadConfigProperty("llm.openai.api.key") ?: ""
+    // Qwen Configuration
+    actual val qwenApiKey: String by lazy {
+        loadConfigProperty("huggingface_token_read") ?: ""
     }
 
-    actual val openaiApiEndpoint: String by lazy {
-        loadConfigProperty("llm.openai.api.endpoint") ?: "https://api.openai.com/v1/chat/completions"
+    actual val qwenApiEndpoint: String by lazy {
+        loadConfigProperty("llm.qwen.api.endpoint") ?: "https://router.huggingface.co/v1/chat/completions"
     }
 
-    // Anthropic Configuration
-    actual val anthropicApiKey: String by lazy {
-        loadConfigProperty("llm.anthropic.api.key") ?: ""
+    // Oreal Configuration (uses same HuggingFace token as Qwen)
+    actual val orealApiKey: String by lazy {
+        loadConfigProperty("huggingface_token_read") ?: ""
     }
 
-    actual val anthropicApiEndpoint: String by lazy {
-        loadConfigProperty("llm.anthropic.api.endpoint") ?: "https://api.anthropic.com/v1/messages"
+    actual val orealApiEndpoint: String by lazy {
+        loadConfigProperty("llm.oreal.api.endpoint") ?: "https://router.huggingface.co/v1/chat/completions"
     }
 
     private fun loadConfigProperty(key: String): String? {

@@ -1,8 +1,8 @@
 package ru.assistant.aicwl.chat.provider
 
 import ru.assistant.aicwl.chat.config.AppConfig
-import ru.assistant.aicwl.chat.provider.anthropic.AnthropicProvider
-import ru.assistant.aicwl.chat.provider.openai.OpenAIProvider
+import ru.assistant.aicwl.chat.provider.oreal.OrealProvider
+import ru.assistant.aicwl.chat.provider.qwen.QwenProvider
 import ru.assistant.aicwl.chat.provider.zai.ZAIProvider
 import ru.assistant.aicwl.chat.utils.createLogger
 
@@ -36,8 +36,8 @@ object AIProviderFactory {
             logger.d("Creating new provider instance: $providerType")
             when (providerType) {
                 ProviderType.ZAI -> createZAIProvider()
-                ProviderType.OPENAI -> createOpenAIProvider()
-                ProviderType.ANTHROPIC -> createAnthropicProvider()
+                ProviderType.QWEN -> createQwenProvider()
+                ProviderType.OREAL -> createOrealProvider()
             }
         }
     }
@@ -53,22 +53,22 @@ object AIProviderFactory {
     }
 
     /**
-     * Create OpenAI provider instance.
+     * Create Qwen provider instance.
      */
-    private fun createOpenAIProvider(): OpenAIProvider {
-        return OpenAIProvider(
-            apiKey = AppConfig.openaiApiKey,
-            endpoint = AppConfig.openaiApiEndpoint
+    private fun createQwenProvider(): QwenProvider {
+        return QwenProvider(
+            apiKey = AppConfig.qwenApiKey,
+            endpoint = AppConfig.qwenApiEndpoint
         )
     }
 
     /**
-     * Create Anthropic provider instance.
+     * Create Oreal provider instance.
      */
-    private fun createAnthropicProvider(): AnthropicProvider {
-        return AnthropicProvider(
-            apiKey = AppConfig.anthropicApiKey,
-            endpoint = AppConfig.anthropicApiEndpoint
+    private fun createOrealProvider(): OrealProvider {
+        return OrealProvider(
+            apiKey = AppConfig.orealApiKey,
+            endpoint = AppConfig.orealApiEndpoint
         )
     }
 

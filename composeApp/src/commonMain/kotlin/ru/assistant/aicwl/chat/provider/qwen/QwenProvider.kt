@@ -1,4 +1,4 @@
-package ru.assistant.aicwl.chat.provider.zai
+package ru.assistant.aicwl.chat.provider.qwen
 
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -10,10 +10,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import ru.assistant.aicwl.chat.config.AppConfig
-import ru.assistant.aicwl.chat.data.ChatRequestParameters
 import ru.assistant.aicwl.chat.data.ChatApiErrorResponse
-import ru.assistant.aicwl.chat.data.zai.ZAIRequestMapper
-import ru.assistant.aicwl.chat.data.zai.ZAIResponseMapper
+import ru.assistant.aicwl.chat.data.qwen.QwenRequestMapper
+import ru.assistant.aicwl.chat.data.qwen.QwenResponseMapper
 import ru.assistant.aicwl.chat.data.unified.UnifiedChatRequest
 import ru.assistant.aicwl.chat.data.unified.UnifiedChatResponse
 import ru.assistant.aicwl.chat.provider.AIProvider
@@ -23,17 +22,17 @@ import ru.assistant.aicwl.chat.provider.model.UnifiedAIModel
 import ru.assistant.aicwl.chat.utils.createLogger
 
 /**
- * Z.ai (智谱AI) provider implementation.
- * Handles communication with Z.ai's GLM model API.
+ * Qwen provider implementation via HuggingFace.
+ * Handles communication with Qwen's API through HuggingFace router.
  *
- * API Documentation: https://api.z.ai
+ * API Documentation: https://huggingface.co/docs/api-inference
  */
-class ZAIProvider(
+class QwenProvider(
     private val apiKey: String,
     private val endpoint: String
 ) : AIProvider {
 
-    private val logger = createLogger("ZAIProvider")
+    private val logger = createLogger("QwenProvider")
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -53,16 +52,16 @@ class ZAIProvider(
         }
     }
 
-    override fun getProviderType(): ProviderType = ProviderType.ZAI
+    override fun getProviderType(): ProviderType = ProviderType.QWEN
 
-    override fun getProviderName(): String = "Z.ai"
+    override fun getProviderName(): String = "Qwen"
 
     override fun getAvailableModels(): List<UnifiedAIModel> {
-        return AIModelConfig.getModelsByProvider(ProviderType.ZAI)
+        return AIModelConfig.getModelsByProvider(ProviderType.QWEN)
     }
 
     override fun getDefaultModel(): UnifiedAIModel {
-        return AIModelConfig.getDefaultModelForProvider(ProviderType.ZAI)
+        return AIModelConfig.getDefaultModelForProvider(ProviderType.QWEN)
     }
 
     override fun isConfigured(): Boolean {
@@ -70,65 +69,64 @@ class ZAIProvider(
     }
 
     override suspend fun sendChatRequest(request: UnifiedChatRequest): Result<UnifiedChatResponse> {
-        logger.i("Sending request to Z.ai. Model: ${request.modelId}")
+        logger.i("Sending request to Qwen. Model: ${request.modelId}")
 
         return try {
-            // Convert unified request to Z.ai format
-            val zaiRequest = ZAIRequestMapper.toZAIRequest(request)
+            // Convert unified request to Qwen format
+            val qwenRequest = QwenRequestMapper.toQwenRequest(request)
 
             // Log request (sanitized)
-            logger.d("Z.ai Request: ${zaiRequest.model}, messages: ${zaiRequest.messages.size}")
-            logger.d("Z.ai Parameters: temperature=${zaiRequest.temperature}, " +
-                     "doSample=${zaiRequest.doSample}, maxTokens=${zaiRequest.maxTokens}, " +
-                     "topP=${zaiRequest.topP}, thinking=${zaiRequest.thinking?.type}")
+            logger.d("Qwen Request: ${qwenRequest.model}, messages: ${qwenRequest.messages.size}")
+            logger.d("Qwen Parameters: temperature=${qwenRequest.temperature}, " +
+                     "maxTokens=${qwenRequest.maxTokens}, topP=${qwenRequest.topP}")
 
             // Make HTTP request
             val response: HttpResponse = client.post(endpoint) {
                 header("Content-Type", "application/json")
                 header("Accept", "application/json")
-                header("Authorization", apiKey) // No "Bearer" prefix for Z.ai
+                header("Authorization", "Bearer $apiKey")
                 header("User-Agent", "AICWL/1.0")
-                setBody(zaiRequest)
+                setBody(qwenRequest)
             }
 
             val rawBody: String = response.body<String>()
 
             // Check for HTTP errors
             if (!response.status.isSuccess()) {
-                logger.e("Z.ai HTTP Error: ${response.status.value}")
-                return handleZAIError(response.status.value, rawBody)
+                logger.e("Qwen HTTP Error: ${response.status.value}")
+                return handleQwenError(response.status.value, rawBody)
             }
 
-            // Parse Z.ai response
-            val zaiResponse = ZAIResponseMapper.parseResponse(rawBody)
+            // Parse Qwen response
+            val qwenResponse = QwenResponseMapper.parseResponse(rawBody)
 
             // Convert to unified format
-            val unifiedResponse = ZAIResponseMapper.toUnifiedResponse(
-                zaiResponse = zaiResponse,
+            val unifiedResponse = QwenResponseMapper.toUnifiedResponse(
+                qwenResponse = qwenResponse,
                 modelUsed = request.modelId,
                 rawResponse = rawBody
             )
 
-            logger.i("Z.ai response received. Content length: ${unifiedResponse.content.length}")
+            logger.i("Qwen response received. Content length: ${unifiedResponse.content.length}")
             Result.success(unifiedResponse)
 
         } catch (e: Exception) {
-            logger.e("Z.ai request failed", e)
+            logger.e("Qwen request failed", e)
             Result.failure(e)
         }
     }
 
     override fun getEndpointInfo(): String {
-        return "Z.ai API: ${endpoint.replace("https://", "")}"
+        return "Qwen API (via HuggingFace): ${endpoint.replace("https://", "")}"
     }
 
-    private fun handleZAIError(statusCode: Int, rawBody: String): Result<UnifiedChatResponse> {
+    private fun handleQwenError(statusCode: Int, rawBody: String): Result<UnifiedChatResponse> {
         return try {
             val errorResponse = json.decodeFromString(ChatApiErrorResponse.serializer(), rawBody)
             val errorMsg = errorResponse.error?.message ?: "HTTP $statusCode"
-            Result.failure(Exception("Z.ai Error: $errorMsg"))
+            Result.failure(Exception("Qwen Error: $errorMsg"))
         } catch (e: Exception) {
-            Result.failure(Exception("Z.ai HTTP $statusCode: ${rawBody.take(200)}"))
+            Result.failure(Exception("Qwen HTTP $statusCode: ${rawBody.take(200)}"))
         }
     }
 
@@ -136,7 +134,7 @@ class ZAIProvider(
      * Close the HTTP client.
      */
     override fun close() {
-        logger.d("Closing Z.ai provider HTTP client")
+        logger.d("Closing Qwen provider HTTP client")
         client.close()
     }
 }

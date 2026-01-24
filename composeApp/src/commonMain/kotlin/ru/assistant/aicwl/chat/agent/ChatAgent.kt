@@ -11,8 +11,7 @@ import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
 import ru.assistant.aicwl.chat.utils.createLogger
 
 /**
- * Агент чата с поддержкой множественных AI-провайдеров.
- * Поддерживает динамическое переключение между Z.ai, OpenAI и Anthropic.
+ * Агент чата с поддержкой Z.ai AI-провайдера.
  *
  * Для обратной совместимости сохраняет старый API с modelId: String,
  * но рекомендуется использовать новые методы с ProviderType.
@@ -27,8 +26,7 @@ class ChatAgent {
     private fun inferProviderFromModel(modelId: String): ProviderType {
         return when {
             modelId.startsWith("glm-") -> ProviderType.ZAI
-            modelId.startsWith("gpt-") -> ProviderType.OPENAI
-            modelId.contains("claude") -> ProviderType.ANTHROPIC
+            modelId.contains("Qwen", ignoreCase = true) || modelId.contains("featherless-ai") -> ProviderType.QWEN
             else -> ProviderType.DEFAULT
         }
     }

@@ -10,18 +10,18 @@ enum class ProviderType(
     val requiresApiKey: Boolean = true
 ) {
     ZAI(
-        displayName = "Z.ai (智谱AI)",
+        displayName = "Z.ai",
         description = "Chinese AI provider with GLM models",
         requiresApiKey = true
     ),
-    OPENAI(
-        displayName = "OpenAI",
-        description = "Leading AI research lab with GPT models",
+    QWEN(
+        displayName = "Qwen",
+        description = "Alibaba's large language model via HuggingFace",
         requiresApiKey = true
     ),
-    ANTHROPIC(
-        displayName = "Anthropic",
-        description = "AI safety company with Claude models",
+    OREAL(
+        displayName = "Oreal",
+        description = "InternLM OREAL model via HuggingFace",
         requiresApiKey = true
     );
 

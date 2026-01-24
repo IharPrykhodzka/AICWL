@@ -38,79 +38,39 @@ object AIModelConfig {
         )
     )
 
-    // ============== OPENAI MODELS ==============
-    private val openaiModels = listOf(
+    // ============== QWEN MODELS ==============
+    private val qwenModels = listOf(
         UnifiedAIModel(
-            providerType = ProviderType.OPENAI,
-            modelId = "gpt-4o",
-            displayName = "GPT-4o (Senior)",
-            description = "Most capable, multimodal, fast",
-            maxTokens = 128000,
-            inputCostPerMillion = 5.0,
-            outputCostPerMillion = 15.0,
-            tier = ModelTier.SENIOR
-        ),
-        UnifiedAIModel(
-            providerType = ProviderType.OPENAI,
-            modelId = "gpt-4o-mini",
-            displayName = "GPT-4o-mini (Middle)",
-            description = "Fast and cost-effective",
-            maxTokens = 128000,
-            inputCostPerMillion = 0.15,
-            outputCostPerMillion = 0.60,
-            tier = ModelTier.MIDDLE
-        ),
-        UnifiedAIModel(
-            providerType = ProviderType.OPENAI,
-            modelId = "gpt-3.5-turbo",
-            displayName = "GPT-3.5-Turbo (Junior)",
-            description = "Fastest, most affordable",
-            maxTokens = 16385,
-            inputCostPerMillion = 0.50,
-            outputCostPerMillion = 1.50,
+            providerType = ProviderType.QWEN,
+            modelId = "gangchen/Qwen2.5-0.5B-Instruct-Gensyn-Swarm-zealous_scurrying_cat:featherless-ai",
+            displayName = "Qwen2.5-0.5B (Junior)",
+            description = "Lightweight model via HuggingFace",
+            maxTokens = 32768,
+            inputCostPerMillion = null,
+            outputCostPerMillion = null,
             tier = ModelTier.JUNIOR
         )
     )
 
-    // ============== ANTHROPIC MODELS ==============
-    private val anthropicModels = listOf(
+    // ============== OREAL MODELS ==============
+    private val orealModels = listOf(
         UnifiedAIModel(
-            providerType = ProviderType.ANTHROPIC,
-            modelId = "claude-3-5-sonnet-20241022",
-            displayName = "Claude 3.5 Sonnet (Senior)",
-            description = "Most capable, excellent for complex tasks",
-            maxTokens = 200000,
-            inputCostPerMillion = 3.0,
-            outputCostPerMillion = 15.0,
-            tier = ModelTier.SENIOR
-        ),
-        UnifiedAIModel(
-            providerType = ProviderType.ANTHROPIC,
-            modelId = "claude-3-5-haiku-20241022",
-            displayName = "Claude 3.5 Haiku (Middle)",
-            description = "Fast and cost-effective",
-            maxTokens = 200000,
-            inputCostPerMillion = 0.25,
-            outputCostPerMillion = 1.25,
+            providerType = ProviderType.OREAL,
+            modelId = "internlm/OREAL-7B-SFT:featherless-ai",
+            displayName = "OREAL-7B-SFT (Middle)",
+            description = "InternLM OREAL model via HuggingFace",
+            maxTokens = 32768,
+            inputCostPerMillion = null,
+            outputCostPerMillion = null,
             tier = ModelTier.MIDDLE
-        ),
-        UnifiedAIModel(
-            providerType = ProviderType.ANTHROPIC,
-            modelId = "claude-3-opus-20240229",
-            displayName = "Claude 3 Opus (Ultra)",
-            description = "Most powerful, slower",
-            maxTokens = 200000,
-            inputCostPerMillion = 15.0,
-            outputCostPerMillion = 75.0,
-            tier = ModelTier.SENIOR
         )
     )
 
     // ============== ALL MODELS ==============
     private val allModels = listOf(
         zaiModels,
-        openaiModels,
-        anthropicModels
+        qwenModels,
+        orealModels
     ).flatten()
 
     /**

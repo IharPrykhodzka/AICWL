@@ -87,12 +87,8 @@ android {
             localProperties.load(localPropertiesFile.inputStream())
         }
         val llmApiKey = localProperties.getProperty("llm.z.api.key") ?: ""
-        val openaiApiKey = localProperties.getProperty("llm.openai.api.key") ?: ""
-        val anthropicApiKey = localProperties.getProperty("llm.anthropic.api.key") ?: ""
 
         buildConfigField("String", "LLM_API_KEY", "\"$llmApiKey\"")
-        buildConfigField("String", "OPENAI_API_KEY", "\"$openaiApiKey\"")
-        buildConfigField("String", "ANTHROPIC_API_KEY", "\"$anthropicApiKey\"")
     }
     buildFeatures {
         buildConfig = true
