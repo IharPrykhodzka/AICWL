@@ -26,7 +26,8 @@ import ru.assistant.aicwl.chat.utils.createLogger
  * Поддерживает структурированные ответы от AI.
  */
 class ChatViewModel(
-    private val chatHistoryRepository: ru.assistant.aicwl.chat.data.ChatHistoryRepository
+    private val chatHistoryRepository: ru.assistant.aicwl.chat.data.ChatHistoryRepository,
+    private val tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker? = null
 ) : ViewModel() {
     private val logger = createLogger("ChatViewModel")
 
@@ -35,6 +36,7 @@ class ChatViewModel(
 
     init {
         loadChatHistory()
+        loadTokenStatistics()
     }
 
     /**
@@ -88,6 +90,66 @@ class ChatViewModel(
      */
     fun updateInputText(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
+
+        // Обновляем оценку токенов для ввода
+        tokenTracker?.let { tracker ->
+            val model = _uiState.value.selectedModel
+            val estimate = ru.assistant.aicwl.chat.tokens.TokenCounter.estimateTextTokens(text, model)
+            _uiState.value = _uiState.value.copy(currentInputEstimate = estimate)
+        }
+    }
+
+    /**
+     * Загружает статистику токенов.
+     */
+    private fun loadTokenStatistics() {
+        viewModelScope.launch {
+            try {
+                tokenTracker?.let { tracker ->
+                    val stats = tracker.getCurrentStatistics()
+                    _uiState.value = _uiState.value.copy(tokenStatistics = stats)
+                    logger.i("Loaded token statistics: ${stats.totalRequests} requests, ${stats.totalTokens} tokens")
+                }
+            } catch (e: Exception) {
+                logger.e("Failed to load token statistics", e)
+            }
+        }
+    }
+
+    /**
+     * Сбрасывает статистику токенов.
+     */
+    fun resetTokenStatistics() {
+        viewModelScope.launch {
+            try {
+                tokenTracker?.resetStatistics()
+                // Обновляем UI после сброса
+                tokenTracker?.let { tracker ->
+                    val stats = tracker.getCurrentStatistics()
+                    _uiState.value = _uiState.value.copy(tokenStatistics = stats)
+                }
+                logger.i("Token statistics reset")
+            } catch (e: Exception) {
+                logger.e("Failed to reset token statistics", e)
+            }
+        }
+    }
+
+    /**
+     * Обновляет статистику токенов в UI.
+     */
+    private fun refreshTokenStatistics() {
+        viewModelScope.launch {
+            try {
+                tokenTracker?.let { tracker ->
+                    val stats = tracker.getCurrentStatistics()
+                    _uiState.value = _uiState.value.copy(tokenStatistics = stats)
+                    logger.d("Token statistics refreshed: ${stats.totalTokens} tokens")
+                }
+            } catch (e: Exception) {
+                logger.e("Failed to refresh token statistics", e)
+            }
+        }
     }
 
     /**
@@ -251,6 +313,9 @@ class ChatViewModel(
 
                 // Auto-save chat history after successful message
                 saveChatHistory()
+
+                // Refresh token statistics after successful message
+                refreshTokenStatistics()
             } catch (e: Exception) {
                 logger.e("Failed to get AI response", e)
 
@@ -402,7 +467,11 @@ class ChatViewModel(
         val businessAnalystHistory: List<InterviewHistoryEntry> = emptyList(),
         // Зафиксированное количество вопросов (из первого ответа AI)
         // Защищает от изменения totalQuestions во время интервью
-        val fixedTotalQuestions: Int? = null
+        val fixedTotalQuestions: Int? = null,
+        // Статистика использования токенов
+        val tokenStatistics: ru.assistant.aicwl.chat.tokens.TokenStatistics = ru.assistant.aicwl.chat.tokens.TokenStatistics(),
+        // Оценка токенов для текущего ввода
+        val currentInputEstimate: ru.assistant.aicwl.chat.tokens.TokenEstimate? = null
     ) {
         // Обратная совместимость - простой список для старого UI
         val messages: List<UiChatMessage>

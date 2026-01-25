@@ -9,6 +9,7 @@ import ru.assistant.aicwl.chat.provider.AIProviderFactory
 import ru.assistant.aicwl.chat.provider.ProviderType
 import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
 import ru.assistant.aicwl.chat.utils.createLogger
+import ru.assistant.aicwl.chat.utils.PlatformTime
 
 /**
  * Агент чата с поддержкой Z.ai AI-провайдера.
@@ -16,7 +17,9 @@ import ru.assistant.aicwl.chat.utils.createLogger
  * Для обратной совместимости сохраняет старый API с modelId: String,
  * но рекомендуется использовать новые методы с ProviderType.
  */
-class ChatAgent {
+class ChatAgent(
+    private val tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker? = null
+) {
     private val logger = createLogger("ChatAgent")
 
     /**
@@ -217,6 +220,55 @@ class ChatAgent {
                     }
 
                     logger.i("Response received. Length: ${actualContent.length}")
+
+                    // Записываем использование токенов (с fallback на оценку)
+                    tokenTracker?.let { tracker ->
+                        val model = ru.assistant.aicwl.chat.provider.model.AIModelConfig
+                            .getAllModels()
+                            .find { it.modelId == modelId }
+
+                        if (model != null) {
+                            // Проверяем есть ли реальные данные от API
+                            val hasValidUsage = response.usage != null &&
+                                    response.usage.promptTokens != null &&
+                                    response.usage.completionTokens != null
+
+                            if (hasValidUsage) {
+                                // Используем данные от API
+                                tracker.recordFromApi(
+                                    apiUsage = ru.assistant.aicwl.chat.data.Usage(
+                                        promptTokens = response.usage.promptTokens,
+                                        completionTokens = response.usage.completionTokens,
+                                        totalTokens = response.usage.totalTokens
+                                    ),
+                                    model = model,
+                                    timestamp = PlatformTime.currentTimeMillis()
+                                )
+                                logger.d("Token usage recorded from API")
+                            } else {
+                                // Fallback: оцениваем токены на стороне клиента
+                                val promptText = messages.joinToString("\n") { it.content }
+                                val estimatedPromptTokens = ru.assistant.aicwl.chat.tokens.TokenCounter.estimateTokens(promptText)
+                                val estimatedCompletionTokens = ru.assistant.aicwl.chat.tokens.TokenCounter.estimateTokens(actualContent)
+                                val estimatedTotal = estimatedPromptTokens + estimatedCompletionTokens
+
+                                // Создаём Usage объект с оценёнными значениями
+                                val estimatedUsage = ru.assistant.aicwl.chat.data.Usage(
+                                    promptTokens = estimatedPromptTokens,
+                                    completionTokens = estimatedCompletionTokens,
+                                    totalTokens = estimatedTotal
+                                )
+
+                                tracker.recordFromApi(
+                                    apiUsage = estimatedUsage,
+                                    model = model,
+                                    timestamp = PlatformTime.currentTimeMillis()
+                                )
+                                logger.d("Token usage estimated on client side: prompt=$estimatedPromptTokens, completion=$estimatedCompletionTokens, total=$estimatedTotal")
+                            }
+                        }
+                    }
+
                     actualContent
                 },
                 onFailure = { exception ->
@@ -253,5 +305,44 @@ class ChatAgent {
 
 /**
  * Одиночный экземпляр (singleton) агента чата.
+ * Использует ленивую инициализацию с поддержкой TokenTracker.
  */
-val chatAgent = ChatAgent()
+@Volatile
+private var chatAgentInstance: ChatAgent? = null
+
+/**
+ * Блокировка для потокобезопасности (KMP совместимый подход).
+ */
+private val agentLock = Any()
+
+/**
+ * Получает экземпляр ChatAgent с опциональным TokenTracker.
+ * Если TokenTracker доступен, будет использоваться для отслеживания токенов.
+ */
+fun getChatAgent(tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker? = null): ChatAgent {
+    return chatAgentInstance ?: synchronized(agentLock) {
+        chatAgentInstance ?: ChatAgent(tokenTracker = tokenTracker).also { chatAgentInstance = it }
+    }
+}
+
+/**
+ * Инициализирует ChatAgent с указанным TokenTracker.
+ * Должна вызываться при запуске приложения для включения отслеживания токенов.
+ */
+fun initializeChatAgent(tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker?) {
+    if (chatAgentInstance == null && tokenTracker != null) {
+        synchronized(agentLock) {
+            if (chatAgentInstance == null) {
+                chatAgentInstance = ChatAgent(tokenTracker = tokenTracker)
+            }
+        }
+    }
+}
+
+/**
+ * Одиночный экземпляр агента чата (для обратной совместимости).
+ * Рекомендуется использовать getChatAgent() с TokenTracker.
+ */
+@Deprecated("Use getChatAgent() with TokenTracker for token tracking", ReplaceWith("getChatAgent(tokenTracker)"))
+val chatAgent: ChatAgent
+    get() = getChatAgent()

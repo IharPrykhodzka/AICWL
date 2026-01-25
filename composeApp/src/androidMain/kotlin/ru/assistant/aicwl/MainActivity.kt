@@ -12,6 +12,10 @@ import ru.assistant.aicwl.chat.prompt.data.PromptPreferences
 import ru.assistant.aicwl.chat.data.ChatHistoryPreferences
 import ru.assistant.aicwl.chat.ui.initializeChatViewModelFactory
 import ru.assistant.aicwl.chat.prompt.SystemPromptConfig
+import ru.assistant.aicwl.chat.tokens.TokenStorage
+import ru.assistant.aicwl.chat.tokens.initializeTokenTracker
+import ru.assistant.aicwl.chat.tokens.getTokenTracker
+import ru.assistant.aicwl.chat.agent.initializeChatAgent
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,9 +40,19 @@ class MainActivity : ComponentActivity() {
             chatHistoryPrefs = chatHistoryPrefs
         )
 
+        // Initialize TokenStorage and TokenTracker
+        val tokenStorage = TokenStorage()
+        tokenStorage.initialize(applicationContext)
+        initializeTokenTracker(tokenStorage)
+        val tokenTracker = getTokenTracker(tokenStorage)
+
+        // Initialize ChatAgent with TokenTracker
+        initializeChatAgent(tokenTracker)
+
         // Инициализируем фабрику ChatViewModel
         initializeChatViewModelFactory(
-            PromptSettingsViewModelFactory.getChatHistoryRepository()
+            chatHistoryRepository = PromptSettingsViewModelFactory.getChatHistoryRepository(),
+            tokenTracker = tokenTracker
         )
 
         setContent {

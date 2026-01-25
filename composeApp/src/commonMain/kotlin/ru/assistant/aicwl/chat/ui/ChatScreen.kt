@@ -36,6 +36,7 @@ import ru.assistant.aicwl.chat.data.MessageRole
 import ru.assistant.aicwl.chat.data.MessageType
 import ru.assistant.aicwl.chat.data.UiChatMessage
 import ru.assistant.aicwl.chat.ui.components.StructuredResponseCard
+import ru.assistant.aicwl.chat.ui.components.TokenStatsPanel
 import ru.assistant.aicwl.chat.prompt.ui.PromptSettingsViewModel
 import ru.assistant.aicwl.chat.prompt.ui.PromptSettingsViewModelFactory
 import ru.assistant.aicwl.chat.prompt.ui.components.PromptSettingsScreen
@@ -55,6 +56,7 @@ fun ChatScreen(
 
     // Navigation state
     var showSettingsScreen by remember { mutableStateOf(false) }
+    var showTokenStats by remember { mutableStateOf(false) }
 
     // Load custom prompt on composition
     LaunchedEffect(Unit) {
@@ -119,7 +121,10 @@ fun ChatScreen(
                     selectedProfile = uiState.selectedProfile,
                     onProfileSelected = { viewModel.selectProfile(it) },
                     onClearChat = { viewModel.clearChat() },
-                    onSettingsClick = { showSettingsScreen = true }
+                    onSettingsClick = { showSettingsScreen = true },
+                    onTokenStatsClick = { showTokenStats = true },
+                    totalTokens = uiState.tokenStatistics.totalTokens,
+                    totalCost = uiState.tokenStatistics.totalCost
                 )
             }
         ) { padding ->
@@ -161,10 +166,23 @@ fun ChatScreen(
                     onSend = { viewModel.sendMessage() },
                     isLoading = uiState.isLoading,
                     isBusinessAnalystMode = uiState.isBusinessAnalystMode,
-                    onBusinessAnalystModeToggle = { viewModel.toggleBusinessAnalystMode() }
+                    onBusinessAnalystModeToggle = { viewModel.toggleBusinessAnalystMode() },
+                    tokenEstimate = uiState.currentInputEstimate
                 )
             }
         }
+    }
+
+    // Диалог статистики токенов
+    if (showTokenStats) {
+        TokenStatsPanel(
+            statistics = uiState.tokenStatistics,
+            onDismiss = { showTokenStats = false },
+            onReset = {
+                viewModel.resetTokenStatistics()
+                showTokenStats = false
+            }
+        )
     }
 }
 
@@ -179,7 +197,10 @@ fun ChatTopBar(
     selectedProfile: TemperatureProfile,
     onProfileSelected: (TemperatureProfile) -> Unit,
     onClearChat: () -> Unit,
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onTokenStatsClick: () -> Unit = {},
+    totalTokens: Int = 0,
+    totalCost: Double = 0.0
 ) {
     var modelExpanded by remember { mutableStateOf(false) }
     var profileExpanded by remember { mutableStateOf(false) }
@@ -194,11 +215,48 @@ fun ChatTopBar(
                     text = "AI Chat Agent",
                     style = MaterialTheme.typography.titleMedium
                 )
-                Text(
-                    text = "${selectedModel.displayName} • ${selectedProfile.displayName}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = selectedModel.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = selectedProfile.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (totalTokens > 0) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = ru.assistant.aicwl.chat.tokens.TokenCounter.formatTokenCount(totalTokens),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = ru.assistant.aicwl.chat.tokens.TokenCounter.formatCost(totalCost),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
             }
         },
         actions = {
@@ -315,6 +373,18 @@ fun ChatTopBar(
                 Icon(
                     imageVector = Icons.Default.Clear,
                     contentDescription = "Clear chat"
+                )
+            }
+
+            // Кнопка статистики токенов
+            IconButton(onClick = onTokenStatsClick) {
+                Icon(
+                    imageVector = Icons.Default.Workspaces,
+                    contentDescription = "Token statistics",
+                    tint = if (totalTokens > 0)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -573,7 +643,8 @@ fun ChatInputField(
     onSend: () -> Unit,
     isLoading: Boolean,
     isBusinessAnalystMode: Boolean = false,
-    onBusinessAnalystModeToggle: () -> Unit = {}
+    onBusinessAnalystModeToggle: () -> Unit = {},
+    tokenEstimate: ru.assistant.aicwl.chat.tokens.TokenEstimate? = null
 ) {
     Row(
         modifier = Modifier
@@ -588,48 +659,55 @@ fun ChatInputField(
             on_toggle = onBusinessAnalystModeToggle
         )
 
-        OutlinedTextField(
-            value = inputText,
-            onValueChange = onInputChanged,
-            modifier = Modifier
-                .weight(1f)
-                .onPreviewKeyEvent { keyEvent ->
-                    // Проверяем, нажата ли клавиша Enter
-                    val isEnter = isEnterKeyPressed(keyEvent)
+        Column(modifier = Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = onInputChanged,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { keyEvent ->
+                        // Проверяем, нажата ли клавиша Enter
+                        val isEnter = isEnterKeyPressed(keyEvent)
 
-                    if (isEnter) {
-                        // Shift + Enter = новая строка (поведение по умолчанию, возвращаем false для разрешения)
-                        if (keyEvent.isShiftPressed) {
-                            false  // Разрешаем поведение по умолчанию (новая строка)
-                        } else {
-                            // Enter = отправка сообщения
-                            if (inputText.isNotBlank() && !isLoading) {
-                                onSend()
+                        if (isEnter) {
+                            // Shift + Enter = новая строка (поведение по умолчанию, возвращаем false для разрешения)
+                            if (keyEvent.isShiftPressed) {
+                                false  // Разрешаем поведение по умолчанию (новая строка)
+                            } else {
+                                // Enter = отправка сообщения
+                                if (inputText.isNotBlank() && !isLoading) {
+                                    onSend()
+                                }
+                                true  // Поглощаем событие (предотвращаем новую строку)
                             }
-                            true  // Поглощаем событие (предотвращаем новую строку)
+                        } else {
+                            false  // Разрешаем другие клавиши
                         }
-                    } else {
-                        false  // Разрешаем другие клавиши
-                    }
+                    },
+                placeholder = {
+                    Text(
+                        if (isBusinessAnalystMode) "Опишите вашу идею для ТЗ..."
+                        else "Type your message..."
+                    )
                 },
-            placeholder = {
-                Text(
-                    if (isBusinessAnalystMode) "Опишите вашу идею для ТЗ..."
-                    else "Type your message..."
-                )
-            },
-            enabled = !isLoading,
-            maxLines = 4,
-            shape = RoundedCornerShape(24.dp),
-            colors = if (isBusinessAnalystMode) {
-                OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.tertiary,
-                    focusedLabelColor = MaterialTheme.colorScheme.tertiary
-                )
-            } else {
-                OutlinedTextFieldDefaults.colors()
+                enabled = !isLoading,
+                maxLines = 4,
+                shape = RoundedCornerShape(24.dp),
+                colors = if (isBusinessAnalystMode) {
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                        focusedLabelColor = MaterialTheme.colorScheme.tertiary
+                    )
+                } else {
+                    OutlinedTextFieldDefaults.colors()
+                }
+            )
+
+            // Индикатор токенов
+            if (tokenEstimate != null && tokenEstimate.estimatedTokens > 0) {
+                TokenEstimateIndicator(estimate = tokenEstimate)
             }
-        )
+        }
 
         FloatingActionButton(
             onClick = { if (inputText.isNotBlank() && !isLoading) onSend() },
@@ -801,6 +879,37 @@ private fun CopyButton(
         if (show_copied_feedback) {
             kotlinx.coroutines.delay(2000)
             show_copied_feedback = false
+        }
+    }
+}
+
+/**
+ * Индикатор оценки токенов для вводимого текста.
+ * Показывает приблизительное количество токенов и стоимость.
+ */
+@Composable
+private fun TokenEstimateIndicator(
+    estimate: ru.assistant.aicwl.chat.tokens.TokenEstimate
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "~${estimate.estimatedTokens} токенов",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+
+        if (estimate.estimatedCost > 0) {
+            Text(
+                text = "~${ru.assistant.aicwl.chat.tokens.TokenCounter.formatCost(estimate.estimatedCost)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            )
         }
     }
 }

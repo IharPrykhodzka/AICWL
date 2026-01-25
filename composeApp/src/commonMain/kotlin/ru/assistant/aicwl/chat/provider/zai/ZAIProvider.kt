@@ -102,6 +102,15 @@ class ZAIProvider(
             // Parse Z.ai response
             val zaiResponse = ZAIResponseMapper.parseResponse(rawBody)
 
+            // Log usage data for debugging
+            if (zaiResponse.usage != null) {
+                logger.i("Z.ai usage data: prompt=${zaiResponse.usage.promptTokens}, " +
+                        "completion=${zaiResponse.usage.completionTokens}, " +
+                        "total=${zaiResponse.usage.totalTokens}")
+            } else {
+                logger.w("Z.ai response does NOT contain usage data!")
+            }
+
             // Convert to unified format
             val unifiedResponse = ZAIResponseMapper.toUnifiedResponse(
                 zaiResponse = zaiResponse,

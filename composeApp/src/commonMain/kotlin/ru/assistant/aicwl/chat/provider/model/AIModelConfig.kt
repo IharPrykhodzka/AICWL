@@ -16,8 +16,8 @@ object AIModelConfig {
             displayName = "GLM-4.7 (Senior)",
             description = "Most powerful, best for complex tasks",
             maxTokens = 131072,
-            inputCostPerMillion = null, // Pricing not publicly available
-            outputCostPerMillion = null,
+            inputCostPerMillion = 10.0,
+            outputCostPerMillion = 10.0,
             tier = ModelTier.SENIOR
         ),
         UnifiedAIModel(
@@ -26,6 +26,8 @@ object AIModelConfig {
             displayName = "GLM-4.7-Flash (Middle)",
             description = "Balanced performance and speed",
             maxTokens = 131072,
+            inputCostPerMillion = 0.5,
+            outputCostPerMillion = 0.5,
             tier = ModelTier.MIDDLE
         ),
         UnifiedAIModel(
@@ -34,6 +36,8 @@ object AIModelConfig {
             displayName = "GLM-4.5-Air (Junior)",
             description = "Fastest, best for simple tasks",
             maxTokens = 98304,
+            inputCostPerMillion = 0.1,
+            outputCostPerMillion = 0.1,
             tier = ModelTier.JUNIOR
         )
     )
