@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.assistant.aicwl.chat.utils.createLogger
+import ru.assistant.aicwl.chat.data.MessageTokenInfo
 
 /**
  * Менеджер для отслеживания использования токенов и стоимости.
@@ -25,6 +26,9 @@ class TokenTracker(
 
     // Flag to ensure statistics are loaded only once
     private var initialized = false
+
+    // Последняя записанная информация о токенах для отображения в сообщениях
+    private var lastTokenUsage: TokenUsage? = null
 
     init {
         logger.i("TokenTracker initialized")
@@ -68,6 +72,9 @@ class TokenTracker(
     suspend fun recordUsage(usage: TokenUsage) {
         try {
             ensureInitialized()
+
+            // Сохраняем как последнее использование для отображения в сообщениях
+            lastTokenUsage = usage
 
             val newStats = _statistics.value.addUsage(usage)
             _statistics.value = newStats
@@ -167,6 +174,27 @@ class TokenTracker(
      * Возвращает общее количество токенов completion.
      */
     fun getTotalCompletionTokens(): Int = _statistics.value.totalCompletionTokens
+
+    /**
+     * Возвращает информацию о последнем использовании токенов.
+     * Используется для отображения токенов в сообщениях чата.
+     */
+    fun getLastTokenUsage(): TokenUsage? = lastTokenUsage
+
+    /**
+     * Создаёт MessageTokenInfo из последнего использования токенов.
+     * Возвращает null если нет информации о последнем использовании.
+     */
+    fun getLastMessageTokenInfo(): MessageTokenInfo? {
+        return lastTokenUsage?.let { usage ->
+            MessageTokenInfo(
+                promptTokens = usage.promptTokens,
+                completionTokens = usage.completionTokens,
+                totalTokens = usage.totalTokens,
+                cost = usage.estimatedCost
+            )
+        }
+    }
 }
 
 /**

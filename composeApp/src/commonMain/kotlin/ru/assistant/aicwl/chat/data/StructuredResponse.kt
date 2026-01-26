@@ -253,6 +253,16 @@ enum class MessageType {
 }
 
 /**
+ * Информация о токенах для сообщения.
+ */
+data class MessageTokenInfo(
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    val totalTokens: Int = 0,
+    val cost: Double = 0.0
+)
+
+/**
  * Расширенное сообщение чата для UI с поддержкой структурированных ответов.
  */
 data class EnhancedChatMessage(
@@ -261,7 +271,8 @@ data class EnhancedChatMessage(
     val originalContent: String,
     val timestamp: Long = 0L,
     val messageType: MessageType = MessageType.PLAIN_TEXT,
-    val structuredData: StructuredAiResponse? = null
+    val structuredData: StructuredAiResponse? = null,
+    val tokenInfo: MessageTokenInfo? = null
 ) {
     /**
      * Возвращает текст для отображения в списке чата.
@@ -293,7 +304,8 @@ data class EnhancedChatMessage(
         fun fromAiResponse(
             id: String,
             content: String,
-            timestamp: Long
+            timestamp: Long,
+            tokenInfo: MessageTokenInfo? = null
         ): EnhancedChatMessage {
             val structured = StructuredAiResponse.tryParse(content)
 
@@ -319,7 +331,8 @@ data class EnhancedChatMessage(
                 originalContent = content,
                 timestamp = timestamp,
                 messageType = if (structured != null) MessageType.STRUCTURED else MessageType.PLAIN_TEXT,
-                structuredData = structured
+                structuredData = structured,
+                tokenInfo = tokenInfo
             )
         }
     }

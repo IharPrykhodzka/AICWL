@@ -42,7 +42,6 @@ class MainActivity : ComponentActivity() {
 
         // Initialize TokenStorage and TokenTracker
         val tokenStorage = TokenStorage()
-        tokenStorage.initialize(applicationContext)
         initializeTokenTracker(tokenStorage)
         val tokenTracker = getTokenTracker(tokenStorage)
 

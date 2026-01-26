@@ -16,7 +16,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.assistant.aicwl.chat.data.ResponseStatus
 import ru.assistant.aicwl.chat.data.StructuredAiResponse
+import ru.assistant.aicwl.chat.utils.getClipboardManager
 
 /**
  * Карточка со структурированным ответом от AI.
@@ -54,23 +58,35 @@ fun StructuredResponseCard(
     modifier: Modifier = Modifier,
     onSuggestionClick: (String) -> Unit = {}
 ) {
-    // Определяем режим: бизнес-аналитик если есть вопросы или summary
-    val isBusinessAnalystMode = response.questions.isNotEmpty() ||
-            response.questionNumber != null ||
-            response.summary.isNotBlank()
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top
+    ) {
+        // Определяем режим: бизнес-аналитик если есть вопросы или summary
+        val isBusinessAnalystMode = response.questions.isNotEmpty() ||
+                response.questionNumber != null ||
+                response.summary.isNotBlank()
 
-    if (isBusinessAnalystMode) {
-        EnhancedStructuredResponseCard(
-            response = response,
-            modifier = modifier,
-            onSuggestionClick = onSuggestionClick
-        )
-    } else {
-        MinimalistResponseCard(
-            response = response,
-            modifier = modifier,
-            onSuggestionClick = onSuggestionClick
-        )
+        // Контент карточки
+        if (isBusinessAnalystMode) {
+            EnhancedStructuredResponseCard(
+                response = response,
+                modifier = Modifier.weight(1f),
+                onSuggestionClick = onSuggestionClick
+            )
+        } else {
+            MinimalistResponseCard(
+                response = response,
+                modifier = Modifier.weight(1f),
+                onSuggestionClick = onSuggestionClick
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Кнопка копирования
+        StructuredCopyButton(response = response)
     }
 }
 
@@ -86,8 +102,7 @@ private fun MinimalistResponseCard(
 ) {
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 0.dp, vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
@@ -151,8 +166,7 @@ private fun EnhancedStructuredResponseCard(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 0.dp, vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = when (response.computedStatus) {
@@ -1315,6 +1329,98 @@ private fun MinimalistSuggestionsSection(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Кнопка копирования для структурированных ответов.
+ * Копирует всё содержимое ответа в форматированном виде.
+ */
+@Composable
+private fun StructuredCopyButton(response: StructuredAiResponse) {
+    var showCopiedFeedback by remember { mutableStateOf(false) }
+
+    // Форматируем текст для копирования
+    val textToCopy = remember(response) {
+        buildString {
+            // Summary
+            if (response.safeSummary.isNotBlank()) {
+                append(response.safeSummary)
+                append("\n\n")
+            }
+
+            // Reasoning
+            if (response.reasoning.isNotBlank()) {
+                append("Логика:\n")
+                append(response.reasoning)
+                append("\n\n")
+            }
+
+            // Questions
+            if (response.questions.isNotEmpty()) {
+                append("Уточняющие вопросы:\n")
+                response.questions.forEachIndexed { index, question ->
+                    append("${index + 1}. $question\n")
+                }
+                append("\n")
+            }
+
+            // Action Items
+            if (response.actionItems.isNotEmpty()) {
+                append("Что нужно сделать:\n")
+                response.actionItems.forEachIndexed { index, item ->
+                    append("${index + 1}. $item\n")
+                }
+                append("\n")
+            }
+
+            // Content
+            if (response.content.isNotBlank()) {
+                append("Подробный ответ:\n")
+                append(response.content)
+                append("\n\n")
+            }
+
+            // Highlights
+            if (response.highlights.isNotEmpty()) {
+                append("Главное:\n")
+                response.highlights.forEachIndexed { index, highlight ->
+                    append("• $highlight\n")
+                }
+                append("\n")
+            }
+
+            // Suggestions
+            if (response.suggestions.isNotEmpty()) {
+                append("Продолжить диалог:\n")
+                response.suggestions.forEachIndexed { index, suggestion ->
+                    append("${index + 1}. $suggestion\n")
+                }
+            }
+        }.trim()
+    }
+
+    IconButton(
+        onClick = {
+            getClipboardManager().setText(textToCopy)
+            showCopiedFeedback = true
+        },
+        modifier = Modifier.size(32.dp)
+    ) {
+        Icon(
+            imageVector = if (showCopiedFeedback) Icons.Default.Check else Icons.Default.ContentCopy,
+            contentDescription = if (showCopiedFeedback) "Скопировано" else "Копировать ответ",
+            tint = if (showCopiedFeedback) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+
+    // Сбросить состояние через 2 секунды
+    LaunchedEffect(showCopiedFeedback) {
+        if (showCopiedFeedback) {
+            kotlinx.coroutines.delay(2000)
+            showCopiedFeedback = false
         }
     }
 }

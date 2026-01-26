@@ -44,10 +44,17 @@ class ChatViewModel(
      */
     fun selectModel(model: UnifiedAIModel) {
         logger.i("Model selected: ${model.modelId} (${model.displayName}) - Provider: ${model.providerType}")
+
+        // Обновляем модель и пересчитываем оценку токенов
         _uiState.value = _uiState.value.copy(
             selectedModel = model,
             selectedProvider = model.providerType
         )
+
+        // Пересчитываем оценку токенов для текущего ввода
+        if (_uiState.value.inputText.isNotBlank()) {
+            updateInputText(_uiState.value.inputText)
+        }
     }
 
     /**
@@ -75,6 +82,11 @@ class ChatViewModel(
             selectedProvider = provider,
             selectedModel = defaultModel
         )
+
+        // Пересчитываем оценку токенов для текущего ввода
+        if (_uiState.value.inputText.isNotBlank()) {
+            updateInputText(_uiState.value.inputText)
+        }
     }
 
     /**
@@ -89,13 +101,62 @@ class ChatViewModel(
      * Обновляет текст ввода пользователя.
      */
     fun updateInputText(text: String) {
-        _uiState.value = _uiState.value.copy(inputText = text)
-
-        // Обновляем оценку токенов для ввода
-        tokenTracker?.let { tracker ->
+        // Вычисляем оценку токенов для ввода и полного запроса
+        val (inputEstimate, requestEstimate) = tokenTracker?.let { tracker ->
             val model = _uiState.value.selectedModel
-            val estimate = ru.assistant.aicwl.chat.tokens.TokenCounter.estimateTextTokens(text, model)
-            _uiState.value = _uiState.value.copy(currentInputEstimate = estimate)
+
+            // Оценка токенов только для ввода (для обратной совместимости)
+            val inputEstimate = ru.assistant.aicwl.chat.tokens.TokenCounter.estimateTextTokens(text, model)
+
+            // Детальная оценка токенов для полного запроса
+            val requestEstimate = calculateRequestTokenEstimate(text, model)
+
+            Pair(inputEstimate, requestEstimate)
+        } ?: Pair(null, null)
+
+        // Обновляем состояние одним вызовом copy
+        _uiState.value = _uiState.value.copy(
+            inputText = text,
+            currentInputEstimate = inputEstimate,
+            requestTokenEstimate = requestEstimate
+        )
+    }
+
+    /**
+     * Вычисляет детальную оценку токенов для полного запроса.
+     * Учитывает системный промпт, историю сообщений и текущий ввод.
+     */
+    private fun calculateRequestTokenEstimate(
+        inputText: String,
+        model: ru.assistant.aicwl.chat.provider.model.UnifiedAIModel
+    ): ru.assistant.aicwl.chat.tokens.RequestTokenEstimate? {
+        val isBusinessMode = _uiState.value.isBusinessAnalystMode
+
+        return if (isBusinessMode) {
+            // В режиме бизнес-аналитика используем историю интервью
+            ru.assistant.aicwl.chat.tokens.RequestTokenEstimate.forRequestWithHistory(
+                inputText = inputText,
+                conversationHistory = _uiState.value.businessAnalystHistory,
+                model = model,
+                currentQuestionNumber = _uiState.value.businessAnalystHistory
+                    .count { it.role == MessageRole.ASSISTANT } + 1,
+                fixedTotalQuestions = _uiState.value.fixedTotalQuestions
+            )
+        } else {
+            // В обычном режиме используем историю enhancedMessages
+            val conversationHistory = _uiState.value.enhancedMessages
+                .map { msg ->
+                    InterviewHistoryEntry(
+                        role = msg.role,
+                        content = msg.originalContent
+                    )
+                }
+
+            ru.assistant.aicwl.chat.tokens.RequestTokenEstimate.forRequestWithHistory(
+                inputText = inputText,
+                conversationHistory = conversationHistory,
+                model = model
+            )
         }
     }
 
@@ -235,15 +296,23 @@ class ChatViewModel(
                 logger.i("AI response received. Length: ${response.length}")
                 logger.d("Response preview: ${response.take(200)}...")
 
+                // Убираем пустые строки в начале и конце ответа
+                val trimmedResponse = response.trim()
+
+                // Получаем информацию о токенах для этого сообщения
+                val tokenInfo = tokenTracker?.getLastMessageTokenInfo()
+
                 // Создаём enhanced сообщение с автоматическим определением типа
                 val assistantMessage = EnhancedChatMessage.fromAiResponse(
                     id = generateId(),
-                    content = response,
-                    timestamp = currentTimeMillis()
+                    content = trimmedResponse,
+                    timestamp = currentTimeMillis(),
+                    tokenInfo = tokenInfo
                 )
 
                 logger.d("Message type: ${assistantMessage.messageType}")
                 logger.d("Is structured: ${assistantMessage.structuredData != null}")
+                logger.d("Token info: ${tokenInfo?.let { "${it.totalTokens} tokens, $${it.cost}" } ?: "N/A"}")
 
                 // Обрабатываем историю для режима бизнес-аналитика
                 val (newHistory, newFixedTotalQuestions) = if (isBusinessMode) {
@@ -471,7 +540,9 @@ class ChatViewModel(
         // Статистика использования токенов
         val tokenStatistics: ru.assistant.aicwl.chat.tokens.TokenStatistics = ru.assistant.aicwl.chat.tokens.TokenStatistics(),
         // Оценка токенов для текущего ввода
-        val currentInputEstimate: ru.assistant.aicwl.chat.tokens.TokenEstimate? = null
+        val currentInputEstimate: ru.assistant.aicwl.chat.tokens.TokenEstimate? = null,
+        // Детальная оценка токенов для полного запроса (system + history + input)
+        val requestTokenEstimate: ru.assistant.aicwl.chat.tokens.RequestTokenEstimate? = null
     ) {
         // Обратная совместимость - простой список для старого UI
         val messages: List<UiChatMessage>

@@ -283,7 +283,7 @@ data class ChatRequestParameters(
             doSample = true,
             temperature = 1.9f,
             topP = 0.9f,
-            maxTokens = null,
+            maxTokens = 4096 * 5,
             stream = false,
             thinking = ThinkingConfig.enabled()
         )
@@ -370,7 +370,7 @@ data class ChatRequestParameters(
             doSample = false,
             temperature = 0.0f,
             topP = null,
-            maxTokens = null,
+            maxTokens = 512,
             stream = false,
             thinking = ThinkingConfig.disabled()
         )

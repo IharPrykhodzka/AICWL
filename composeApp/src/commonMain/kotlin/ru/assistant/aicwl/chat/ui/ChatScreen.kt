@@ -167,7 +167,7 @@ fun ChatScreen(
                     isLoading = uiState.isLoading,
                     isBusinessAnalystMode = uiState.isBusinessAnalystMode,
                     onBusinessAnalystModeToggle = { viewModel.toggleBusinessAnalystMode() },
-                    tokenEstimate = uiState.currentInputEstimate
+                    requestTokenEstimate = uiState.requestTokenEstimate
                 )
             }
         }
@@ -435,7 +435,8 @@ fun EnhancedChatMessageItem(
     if (isUser) {
         UserMessageBubble(
             content = message.originalContent,
-            timestamp = message.timestamp
+            timestamp = message.timestamp,
+            tokenInfo = message.tokenInfo
         )
         return
     }
@@ -453,7 +454,8 @@ fun EnhancedChatMessageItem(
                 // Если structuredData == null, fallback на обычный текст
                 AssistantMessageBubble(
                     content = message.originalContent,
-                    timestamp = message.timestamp
+                    timestamp = message.timestamp,
+                    tokenInfo = message.tokenInfo
                 )
             }
         }
@@ -461,14 +463,16 @@ fun EnhancedChatMessageItem(
             // Сообщение об ошибке
             ErrorMessageBubble(
                 content = message.originalContent,
-                timestamp = message.timestamp
+                timestamp = message.timestamp,
+                tokenInfo = message.tokenInfo
             )
         }
         else -> {
             // Обычный текстовый ответ
             AssistantMessageBubble(
                 content = message.originalContent,
-                timestamp = message.timestamp
+                timestamp = message.timestamp,
+                tokenInfo = message.tokenInfo
             )
         }
     }
@@ -480,7 +484,8 @@ fun EnhancedChatMessageItem(
 @Composable
 private fun UserMessageBubble(
     content: String,
-    timestamp: Long
+    timestamp: Long,
+    tokenInfo: ru.assistant.aicwl.chat.data.MessageTokenInfo? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -515,12 +520,28 @@ private fun UserMessageBubble(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                Text(
-                    text = formatTimestamp(timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.padding(top = 4.dp)
-                )
+                ) {
+                    Text(
+                        text = formatTimestamp(timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                    if (tokenInfo != null && tokenInfo.totalTokens > 0) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = ru.assistant.aicwl.chat.tokens.TokenCounter.formatTokenCount(tokenInfo.totalTokens),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
         }
     }
@@ -532,7 +553,8 @@ private fun UserMessageBubble(
 @Composable
 private fun AssistantMessageBubble(
     content: String,
-    timestamp: Long
+    timestamp: Long,
+    tokenInfo: ru.assistant.aicwl.chat.data.MessageTokenInfo? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -559,12 +581,28 @@ private fun AssistantMessageBubble(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-                Text(
-                    text = formatTimestamp(timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.padding(top = 4.dp)
-                )
+                ) {
+                    Text(
+                        text = formatTimestamp(timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+                    if (tokenInfo != null && tokenInfo.totalTokens > 0) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = ru.assistant.aicwl.chat.tokens.TokenCounter.formatTokenCount(tokenInfo.totalTokens),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
         }
 
@@ -584,7 +622,8 @@ private fun AssistantMessageBubble(
 @Composable
 private fun ErrorMessageBubble(
     content: String,
-    timestamp: Long
+    timestamp: Long,
+    tokenInfo: ru.assistant.aicwl.chat.data.MessageTokenInfo? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -613,12 +652,28 @@ private fun ErrorMessageBubble(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
-                Text(
-                    text = formatTimestamp(timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.padding(top = 4.dp)
-                )
+                ) {
+                    Text(
+                        text = formatTimestamp(timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                    )
+                    if (tokenInfo != null && tokenInfo.totalTokens > 0) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = ru.assistant.aicwl.chat.tokens.TokenCounter.formatTokenCount(tokenInfo.totalTokens),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             }
         }
 
@@ -644,7 +699,7 @@ fun ChatInputField(
     isLoading: Boolean,
     isBusinessAnalystMode: Boolean = false,
     onBusinessAnalystModeToggle: () -> Unit = {},
-    tokenEstimate: ru.assistant.aicwl.chat.tokens.TokenEstimate? = null
+    requestTokenEstimate: ru.assistant.aicwl.chat.tokens.RequestTokenEstimate? = null
 ) {
     Row(
         modifier = Modifier
@@ -703,9 +758,9 @@ fun ChatInputField(
                 }
             )
 
-            // Индикатор токенов
-            if (tokenEstimate != null && tokenEstimate.estimatedTokens > 0) {
-                TokenEstimateIndicator(estimate = tokenEstimate)
+            // Индикатор токенов с детальной разбивкой
+            if (requestTokenEstimate != null && requestTokenEstimate.totalTokens > 0) {
+                RequestTokenEstimateIndicator(estimate = requestTokenEstimate)
             }
         }
 
@@ -884,31 +939,134 @@ private fun CopyButton(
 }
 
 /**
- * Индикатор оценки токенов для вводимого текста.
- * Показывает приблизительное количество токенов и стоимость.
+ * Детальный индикатор оценки токенов для полного запроса.
+ * Показывает разбивку по компонентам: системный промпт, история, ввод.
  */
 @Composable
-private fun TokenEstimateIndicator(
-    estimate: ru.assistant.aicwl.chat.tokens.TokenEstimate
+private fun RequestTokenEstimateIndicator(
+    estimate: ru.assistant.aicwl.chat.tokens.RequestTokenEstimate
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // Основная строка с общим количеством токенов и стоимостью
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "~${estimate.totalTokens} токенов",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+
+                // Показываем количество сообщений в истории если есть
+                if (estimate.historyMessageCount > 0) {
+                    Text(
+                        text = "(${estimate.historyMessageCount} сообщ.)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
+            if (estimate.estimatedCost > 0) {
+                Text(
+                    text = "~${ru.assistant.aicwl.chat.tokens.TokenCounter.formatCost(estimate.estimatedCost)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                )
+            }
+        }
+
+        // Детальная разбивка по компонентам
+        if (estimate.systemPromptTokens > 0 || estimate.historyTokens > 0 || estimate.estimatedCompletionTokens > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Системный промпт
+                if (estimate.systemPromptTokens > 0) {
+                    TokenBreakdownItem(
+                        label = "Система",
+                        tokens = estimate.systemPromptTokens,
+                        percent = estimate.systemPromptPercent,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+
+                // История
+                if (estimate.historyTokens > 0) {
+                    TokenBreakdownItem(
+                        label = "История",
+                        tokens = estimate.historyTokens,
+                        percent = estimate.historyPercent,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+
+                // Текущий ввод
+                if (estimate.inputTokens > 0) {
+                    TokenBreakdownItem(
+                        label = "Ввод",
+                        tokens = estimate.inputTokens,
+                        percent = estimate.inputPercent,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Оценка completion (ответа)
+                if (estimate.estimatedCompletionTokens > 0) {
+                    TokenBreakdownItem(
+                        label = "Ответ",
+                        tokens = estimate.estimatedCompletionTokens,
+                        percent = estimate.completionPercent,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Элемент разбивки токенов с меткой, количеством и процентом.
+ */
+@Composable
+private fun TokenBreakdownItem(
+    label: String,
+    tokens: Int,
+    percent: Float,
+    color: Color
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "~${estimate.estimatedTokens} токенов",
+            text = "$label:",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            color = color.copy(alpha = 0.7f)
         )
-
-        if (estimate.estimatedCost > 0) {
+        Text(
+            text = "$tokens",
+            style = MaterialTheme.typography.labelSmall,
+            color = color.copy(alpha = 0.9f)
+        )
+        if (percent > 0) {
             Text(
-                text = "~${ru.assistant.aicwl.chat.tokens.TokenCounter.formatCost(estimate.estimatedCost)}",
+                text = "(${percent.toInt()}%)",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                color = color.copy(alpha = 0.6f)
             )
         }
     }

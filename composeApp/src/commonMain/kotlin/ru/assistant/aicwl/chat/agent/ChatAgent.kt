@@ -306,22 +306,19 @@ class ChatAgent(
 /**
  * Одиночный экземпляр (singleton) агента чата.
  * Использует ленивую инициализацию с поддержкой TokenTracker.
+ * Note: Для KMP упрощенная реализация без синхронизации.
  */
-@Volatile
 private var chatAgentInstance: ChatAgent? = null
-
-/**
- * Блокировка для потокобезопасности (KMP совместимый подход).
- */
-private val agentLock = Any()
 
 /**
  * Получает экземпляр ChatAgent с опциональным TokenTracker.
  * Если TokenTracker доступен, будет использоваться для отслеживания токенов.
  */
 fun getChatAgent(tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker? = null): ChatAgent {
-    return chatAgentInstance ?: synchronized(agentLock) {
-        chatAgentInstance ?: ChatAgent(tokenTracker = tokenTracker).also { chatAgentInstance = it }
+    return chatAgentInstance ?: run {
+        val instance = ChatAgent(tokenTracker = tokenTracker)
+        chatAgentInstance = instance
+        instance
     }
 }
 
@@ -331,11 +328,7 @@ fun getChatAgent(tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker? = nu
  */
 fun initializeChatAgent(tokenTracker: ru.assistant.aicwl.chat.tokens.TokenTracker?) {
     if (chatAgentInstance == null && tokenTracker != null) {
-        synchronized(agentLock) {
-            if (chatAgentInstance == null) {
-                chatAgentInstance = ChatAgent(tokenTracker = tokenTracker)
-            }
-        }
+        chatAgentInstance = ChatAgent(tokenTracker = tokenTracker)
     }
 }
 
